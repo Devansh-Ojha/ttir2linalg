@@ -17,9 +17,10 @@ Tested on:
 - Triton 3.4.0
 
 ### Environment setup
+On any EDA machine: 
 
 ```bash
-ssh eda-4
+ssh eda-*
 
 python3 -m venv ~/ttir-env
 source ~/ttir-env/bin/activate
@@ -47,7 +48,7 @@ PYTHONPATH=. python dump_ttir.py
 ```
 
 ## Generated TTIR
-
+Output should look like: 
 ```mlir
 module {
   ...
