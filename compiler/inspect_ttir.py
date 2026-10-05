@@ -32,10 +32,6 @@ compiled = triton.compile(
     target=target,
 )
 
-def get_ttir():
-    return compiled.asm["ttir"]
+ttir = compiled.asm["ttir"]
 
-
-if __name__ == "__main__":
-    print(get_ttir())
-
+print(ttir)
