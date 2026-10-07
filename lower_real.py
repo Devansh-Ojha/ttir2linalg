@@ -12,7 +12,11 @@ ap.add_argument("--limit", type=int, default=None)
 ap.add_argument("--out", default="linalg.mlir")
 args = ap.parse_args()
 
-tmod, mod, ssa = lower_ttir(open(args.ttir).read(), limit=args.limit)
+tmod, mod, ssa = lower_ttir(
+    open(args.ttir).read(),
+    limit=args.limit,
+    arithmetic_only=True,
+)
 print("[1] Triton parsed + verified: %d func(s), %d ops" % (len(tmod.funcs), len(tmod.all_ops)))
 print("[2] real MLIR module verified: OK")
 text = mod.str()

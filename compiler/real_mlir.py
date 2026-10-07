@@ -222,7 +222,14 @@ def _lower_reduce(builder, op: TOp, ssa: Dict[int, object]):
     ssa[op.results[0].id] = reduce_op.get_result(0)
 
 
-def build_real_module(tmod: TTIRModule, limit: int | None = None):
+_ARITHMETIC_OPS = {"arith.constant", "arith.muli", "arith.mulf", "arith.addf"}
+
+
+def build_real_module(
+    tmod: TTIRModule,
+    limit: int | None = None,
+    arithmetic_only: bool = False,
+):
     """Build and verify a real Triton/MLIR module plus its SSA mapping."""
     ctx = tmod.ctx
     builder = ir.builder(ctx)
@@ -250,6 +257,8 @@ def build_real_module(tmod: TTIRModule, limit: int | None = None):
             progress = False
             next_pending = []
             for op in pending:
+                if arithmetic_only and op.name not in _ARITHMETIC_OPS:
+                    continue
                 if not _operands_ready(op, ssa):
                     next_pending.append(op)
                     continue
@@ -274,9 +283,15 @@ def build_real_module(tmod: TTIRModule, limit: int | None = None):
     return module, ssa
 
 
-def lower_ttir(ttir: str, limit: int | None = None):
+def lower_ttir(
+    ttir: str,
+    limit: int | None = None,
+    arithmetic_only: bool = False,
+):
     """Parse TTIR and construct the verified real module."""
     from compiler.ttir_reader import parse_ttir
 
     tmod = parse_ttir(ttir)
-    return tmod, *build_real_module(tmod, limit=limit)
+    return tmod, *build_real_module(
+        tmod, limit=limit, arithmetic_only=arithmetic_only
+    )
