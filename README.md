@@ -210,6 +210,9 @@ This uses Triton's bundled MLIR bindings rather than assuming a standalone
 `mlir` Python package. The generated module is currently Triton-dialect MLIR;
 the existing textual Linalg lowering remains available as a semantic reference
 until equivalent Linalg dialect construction is exposed by the target runtime.
+The current real-IR milestone lowers `arith.muli`, `arith.mulf`, `arith.addf`,
+`tt.make_range`, and `tt.reshape` through typed builder APIs while preserving
+the Triton-value-to-MLIR-value SSA map.
 
 The generated module should be parseable and verifiable by MLIR rather than simply being a printed list of operations.
 

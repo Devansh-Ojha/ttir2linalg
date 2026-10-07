@@ -100,6 +100,27 @@ def _lower_arithmetic(builder, op: TOp, ssa: Dict[int, object]):
     ssa[op.results[0].id] = value
 
 
+def _lower_make_range(builder, op: TOp, ssa: Dict[int, object]):
+    if len(op.results) != 1:
+        raise RuntimeError("tt.make_range without one result")
+    result_type = _type(builder, op.results[0].type)
+    ssa[op.results[0].id] = builder.create_make_range(
+        result_type,
+        op.attr_int("start"),
+        op.attr_int("end"),
+    )
+
+
+def _lower_reshape(builder, op: TOp, ssa: Dict[int, object]):
+    if len(op.operands) != 1 or len(op.results) != 1:
+        raise RuntimeError("tt.reshape expects one operand and one result")
+    ssa[op.results[0].id] = builder.create_reshape(
+        _get(ssa, op.operands[0]),
+        list(op.results[0].type.shape),
+        True,
+    )
+
+
 def _type(builder, t):
     if t.kind == "scalar":
         return _scalar_type(builder, t.elem)
@@ -135,11 +156,7 @@ def _lower_op(builder, op: TOp, ssa: Dict[int, object]):
             op.attr_int("axis")
         )
     elif op.name == "tt.make_range":
-        ssa[op.results[0].id] = builder.create_make_range(
-            _type(builder, op.results[0].type),
-            op.attr_int("start"),
-            op.attr_int("end"),
-        )
+        _lower_make_range(builder, op, ssa)
     elif op.name == "tt.splat":
         ssa[op.results[0].id] = builder.create_splat(
             _type(builder, op.results[0].type),
@@ -164,11 +181,7 @@ def _lower_op(builder, op: TOp, ssa: Dict[int, object]):
             ir.EVICTION_POLICY.NORMAL,
         )
     elif op.name == "tt.reshape":
-        ssa[op.results[0].id] = builder.create_reshape(
-            _get(ssa, op.operands[0]),
-            list(op.results[0].type.shape),
-            True,
-        )
+        _lower_reshape(builder, op, ssa)
     elif op.name == "tt.reduce":
         insertion_point = builder.get_insertion_point()
         _lower_reduce(builder, op, ssa)
