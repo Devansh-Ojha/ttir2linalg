@@ -4,14 +4,12 @@ usage: PYTHONPATH=. python lower_real.py [kernel.ttir] [--limit N] [--out linalg
   --limit N   lower only the first N top-level ops (then `return`) -- milestone 1
 """
 import argparse
-from compiler.real_mlir import lower_ttir
+from compiler.standard_mlir import lower_standard
+from compiler.ttir_reader import parse_ttir
 
 ap = argparse.ArgumentParser()
 ap.add_argument("ttir", nargs="?", default="kernel.ttir")
-ap.add_argument("--limit", type=int, default=None)
 ap.add_argument("--out", default="linalg.mlir")
-ap.add_argument("--until", default=None,
-                help="stop after lowering this TTIR operation, e.g. tt.load")
 args = ap.parse_args()
 
 try:
@@ -20,15 +18,10 @@ try:
 except FileNotFoundError as exc:
     ap.error("TTIR file not found: %s" % args.ttir)
 
-tmod, mod, ssa, skipped = lower_ttir(
-    ttir,
-    limit=args.limit,
-    stop_after=args.until,
-)
+tmod = parse_ttir(ttir)
+mod, ssa = lower_standard(tmod)
 print("[1] Triton parsed + verified: %d func(s), %d ops" % (len(tmod.funcs), len(tmod.all_ops)))
 print("[2] real MLIR module verified: OK")
-for item in skipped:
-    print("[skip] %s" % item)
 text = mod.str()
 open(args.out, "w").write(text)
 print("[3] wrote %s (%d SSA value(s))\n" % (args.out, len(ssa)))
