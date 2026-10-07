@@ -6,8 +6,7 @@ reference.  This module proves the complete plumbing:
 
     TTIR text -> parsed Triton IR -> real MLIR operation -> verified module
 
-Only ``arith.constant`` is materialized for now.  Values are kept in an SSA
-map keyed by Triton's stable ``Value.id()``.
+Values are kept in an SSA map keyed by Triton's stable ``Value.id()``.
 """
 from __future__ import annotations
 
@@ -44,7 +43,7 @@ def _function_types(builder, tf: TFunc):
         if arg.type.kind == "scalar":
             result.append(_scalar_type(builder, arg.type.elem))
         elif arg.type.kind == "ptr":
-            result.append(_scalar_type(builder, arg.type.elem))
+            result.append(builder.get_ptr_ty(_scalar_type(builder, arg.type.elem), 1))
         else:
             raise NotImplementedError(
                 "tensor arguments are not part of the real-IR milestone: %s"
@@ -101,6 +100,115 @@ def _lower_arithmetic(builder, op: TOp, ssa: Dict[int, object]):
     ssa[op.results[0].id] = value
 
 
+def _type(builder, t):
+    if t.kind == "scalar":
+        return _scalar_type(builder, t.elem)
+    if t.kind == "ptr":
+        return builder.get_ptr_ty(_scalar_type(builder, t.elem), 1)
+    if t.kind == "tensor":
+        elem = (_scalar_type(builder, t.elem) if not t.elem_is_ptr
+                else builder.get_ptr_ty(_scalar_type(builder, t.elem), 1))
+        return builder.get_block_ty(elem, list(t.shape))
+    raise NotImplementedError("unsupported TTIR type %s" % t.raw)
+
+
+def _get(ssa, value: TValue):
+    try:
+        return ssa[value.id]
+    except KeyError as exc:
+        raise RuntimeError("SSA value %s has not been lowered" % value.name) from exc
+
+
+def _operands_ready(op: TOp, ssa: Dict[int, object]) -> bool:
+    return all(value.id in ssa for value in op.operands)
+
+
+def _lower_op(builder, op: TOp, ssa: Dict[int, object]):
+    if op.name == "arith.constant":
+        if len(op.results) != 1:
+            raise RuntimeError("arith.constant without one result")
+        ssa[op.results[0].id] = _constant(builder, op)
+    elif op.name in {"arith.muli", "arith.mulf", "arith.addf"}:
+        _lower_arithmetic(builder, op, ssa)
+    elif op.name == "tt.get_program_id":
+        ssa[op.results[0].id] = builder.create_get_program_id(
+            op.attr_int("axis")
+        )
+    elif op.name == "tt.make_range":
+        ssa[op.results[0].id] = builder.create_make_range(
+            _type(builder, op.results[0].type),
+            op.attr_int("start"),
+            op.attr_int("end"),
+        )
+    elif op.name == "tt.splat":
+        ssa[op.results[0].id] = builder.create_splat(
+            _type(builder, op.results[0].type),
+            _get(ssa, op.operands[0]),
+        )
+    elif op.name == "tt.addptr":
+        ssa[op.results[0].id] = builder.create_addptr(
+            _get(ssa, op.operands[0]), _get(ssa, op.operands[1])
+        )
+    elif op.name == "tt.load":
+        ssa[op.results[0].id] = builder.create_load(
+            _get(ssa, op.operands[0]),
+            ir.CACHE_MODIFIER.NONE,
+            ir.EVICTION_POLICY.NORMAL,
+            False,
+        )
+    elif op.name == "tt.store":
+        builder.create_store(
+            _get(ssa, op.operands[0]),
+            _get(ssa, op.operands[1]),
+            ir.CACHE_MODIFIER.NONE,
+            ir.EVICTION_POLICY.NORMAL,
+        )
+    elif op.name == "tt.reshape":
+        ssa[op.results[0].id] = builder.create_reshape(
+            _get(ssa, op.operands[0]),
+            list(op.results[0].type.shape),
+            True,
+        )
+    elif op.name == "tt.reduce":
+        insertion_point = builder.get_insertion_point()
+        _lower_reduce(builder, op, ssa)
+        builder.restore_insertion_point(insertion_point)
+    elif op.name in {"tt.reduce.return", "tt.return"}:
+        return
+    else:
+        raise NotImplementedError("unsupported TTIR operation %s" % op.name)
+
+
+def _lower_reduce(builder, op: TOp, ssa: Dict[int, object]):
+    if len(op.operands) != 1 or len(op.results) != 1 or not op.regions:
+        raise RuntimeError("malformed tt.reduce")
+    body = op.regions[0][0]
+    combiner = [item for item in body.ops if item.name != "tt.reduce.return"]
+    if len(combiner) != 1 or len(body.args) != 2:
+        raise NotImplementedError("only a binary tt.reduce combiner is supported")
+    reduce_op = builder.create_reduce([_get(ssa, op.operands[0])],
+                                      op.attr_int("axis"))
+    region = reduce_op.get_region(0)
+    block = builder.create_block_with_parent(
+        region, [_type(builder, body.args[0].type), _type(builder, body.args[1].type)]
+    )
+    builder.set_insertion_point_to_start(block)
+    lhs, rhs = block.arg(0), block.arg(1)
+    creators = {
+        "arith.addf": builder.create_fadd,
+        "arith.mulf": builder.create_fmul,
+        "arith.muli": builder.create_mul,
+    }
+    try:
+        combined = creators[combiner[0].name](lhs, rhs)
+    except KeyError as exc:
+        raise NotImplementedError(
+            "unsupported tt.reduce combiner %s" % combiner[0].name
+        ) from exc
+    builder.create_reduce_ret(combined)
+    ssa[op.results[0].id] = reduce_op.get_result(0)
+
+
 def build_real_module(tmod: TTIRModule, limit: int | None = None):
     """Build and verify a real Triton/MLIR module plus its SSA mapping."""
     ctx = tmod.ctx
@@ -124,13 +232,26 @@ def build_real_module(tmod: TTIRModule, limit: int | None = None):
         ops = _ops_in_order(tf)
         if limit is not None:
             ops = ops[:limit]
-        for op in ops:
-            if op.name == "arith.constant":
-                if len(op.results) != 1:
-                    raise RuntimeError("arith.constant without one result")
-                ssa[op.results[0].id] = _constant(builder, op)
-            elif op.name in {"arith.muli", "arith.mulf", "arith.addf"}:
-                _lower_arithmetic(builder, op, ssa)
+        pending = list(ops)
+        while pending:
+            progress = False
+            next_pending = []
+            for op in pending:
+                if not _operands_ready(op, ssa):
+                    next_pending.append(op)
+                    continue
+                _lower_op(builder, op, ssa)
+                progress = True
+            if not progress:
+                details = ", ".join(
+                    "%s(%s)" % (
+                        op.name,
+                        ", ".join(value.name for value in op.operands),
+                    )
+                    for op in next_pending
+                )
+                raise RuntimeError("cannot resolve TTIR SSA dependencies: " + details)
+            pending = next_pending
 
         builder.ret([])
         fn.finalize()
