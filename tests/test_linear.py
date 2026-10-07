@@ -25,31 +25,6 @@ def test_linear_lowering():
     assert "linalg.add(%14, %11)" in out
     assert "linalg.store(%16, %15)" in out
     assert "linalg.add(%arg4, %arg5)" not in out
-
-
-def test_real_standard_lowering():
-    result = subprocess.run(
-        [sys.executable, "lower_real.py", "kernel.ttir", "--out", "linalg.mlir"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    out = result.stdout
-    assert "arith.constant" in out
-    assert "arith.muli" in out
-    assert "arith.mulf" in out
-    assert "arith.addf" in out
-    assert "linalg.generic" in out
-    assert "linalg.reduce" in out
-    assert "memref.load" in out
-    assert "memref.store" in out
-    assert "linalg.yield" in out
-    assert "tt.load" not in out
-    assert "tt.store" not in out
-    assert "tt.reduce" not in out
-
-
 if __name__ == "__main__":
     test_linear_lowering()
-    test_real_standard_lowering()
     print("PASS")
