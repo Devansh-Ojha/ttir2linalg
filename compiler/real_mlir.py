@@ -265,6 +265,11 @@ def build_real_module(
                 _lower_op(builder, op, ssa)
                 progress = True
             if not progress:
+                if arithmetic_only:
+                    # This mode intentionally does not lower non-arithmetic
+                    # producers, so their dependent arithmetic ops are left
+                    # for the later complete-kernel milestone.
+                    break
                 details = ", ".join(
                     "%s(%s)" % (
                         op.name,

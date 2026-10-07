@@ -217,7 +217,9 @@ the Triton-value-to-MLIR-value SSA map.
 `lower_real.py` is currently restricted to the arithmetic milestone:
 `arith.constant`, `arith.muli`, `arith.mulf`, and `arith.addf`. Other TTIR
 operations are ignored by that entry point until their dedicated lowering
-milestones are enabled.
+milestones are enabled. Arithmetic operations whose operands come from those
+skipped producers are also deferred rather than reported as unresolved
+dependencies.
 
 The generated module should be parseable and verifiable by MLIR rather than simply being a printed list of operations.
 
