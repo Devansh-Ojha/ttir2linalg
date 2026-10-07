@@ -222,9 +222,6 @@ def _lower_reduce(builder, op: TOp, ssa: Dict[int, object]):
     ssa[op.results[0].id] = reduce_op.get_result(0)
 
 
-_ARITHMETIC_OPS = {"arith.constant", "arith.muli", "arith.mulf", "arith.addf"}
-
-
 def build_real_module(
     tmod: TTIRModule,
     limit: int | None = None,
@@ -235,6 +232,18 @@ def build_real_module(
     builder = ir.builder(ctx)
     module = builder.create_module()
     ssa: Dict[int, object] = {}
+    skipped = []
+    enabled_ops = None
+    if arithmetic_only:
+        enabled_ops = {
+            "arith.constant",
+            "arith.muli",
+            "arith.mulf",
+            "arith.addf",
+            "tt.get_program_id",
+            "tt.make_range",
+            "tt.return",
+        }
 
     for tf in tmod.funcs:
         arg_types = _function_types(builder, tf)
@@ -257,18 +266,31 @@ def build_real_module(
             progress = False
             next_pending = []
             for op in pending:
-                if arithmetic_only and op.name not in _ARITHMETIC_OPS:
-                    continue
                 if not _operands_ready(op, ssa):
                     next_pending.append(op)
                     continue
-                _lower_op(builder, op, ssa)
+                if enabled_ops is not None and op.name not in enabled_ops:
+                    skipped.append("%s: lowering not enabled in this stage" % op.name)
+                    progress = True
+                    continue
+                try:
+                    _lower_op(builder, op, ssa)
+                except NotImplementedError as exc:
+                    if not arithmetic_only:
+                        raise
+                    skipped.append("%s: %s" % (op.name, exc))
+                    progress = True
+                    continue
                 progress = True
             if not progress:
                 if arithmetic_only:
-                    # This mode intentionally does not lower non-arithmetic
-                    # producers, so their dependent arithmetic ops are left
-                    # for the later complete-kernel milestone.
+                    skipped.extend(
+                        "%s: operands unavailable (%s)" % (
+                            op.name,
+                            ", ".join(value.name for value in op.operands),
+                        )
+                        for op in next_pending
+                    )
                     break
                 details = ", ".join(
                     "%s(%s)" % (
@@ -285,7 +307,7 @@ def build_real_module(
 
     if not module.verify():
         raise RuntimeError("generated real MLIR module failed verification")
-    return module, ssa
+    return module, ssa, skipped
 
 
 def lower_ttir(
