@@ -12,8 +12,14 @@ ap.add_argument("--limit", type=int, default=None)
 ap.add_argument("--out", default="linalg.mlir")
 args = ap.parse_args()
 
+try:
+    with open(args.ttir) as source_file:
+        ttir = source_file.read()
+except FileNotFoundError as exc:
+    ap.error("TTIR file not found: %s" % args.ttir)
+
 tmod, mod, ssa = lower_ttir(
-    open(args.ttir).read(),
+    ttir,
     limit=args.limit,
     arithmetic_only=True,
 )
