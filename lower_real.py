@@ -10,6 +10,8 @@ ap = argparse.ArgumentParser()
 ap.add_argument("ttir", nargs="?", default="kernel.ttir")
 ap.add_argument("--limit", type=int, default=None)
 ap.add_argument("--out", default="linalg.mlir")
+ap.add_argument("--until", default=None,
+                help="stop after lowering this TTIR operation, e.g. tt.load")
 args = ap.parse_args()
 
 try:
@@ -21,6 +23,7 @@ except FileNotFoundError as exc:
 tmod, mod, ssa, skipped = lower_ttir(
     ttir,
     limit=args.limit,
+    stop_after=args.until,
 )
 print("[1] Triton parsed + verified: %d func(s), %d ops" % (len(tmod.funcs), len(tmod.all_ops)))
 print("[2] real MLIR module verified: OK")

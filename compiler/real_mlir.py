@@ -144,6 +144,17 @@ def _operands_ready(op: TOp, ssa: Dict[int, object]) -> bool:
     return all(value.id in ssa for value in op.operands)
 
 
+def _lower_load(builder, op: TOp, ssa: Dict[int, object]):
+    if len(op.operands) != 1 or len(op.results) != 1:
+        raise RuntimeError("tt.load expects one operand and one result")
+    ssa[op.results[0].id] = builder.create_load(
+        _get(ssa, op.operands[0]),
+        ir.CACHE_MODIFIER.NONE,
+        ir.EVICTION_POLICY.NORMAL,
+        False,
+    )
+
+
 def _lower_op(builder, op: TOp, ssa: Dict[int, object]):
     if op.name == "arith.constant":
         if len(op.results) != 1:
@@ -167,12 +178,7 @@ def _lower_op(builder, op: TOp, ssa: Dict[int, object]):
             _get(ssa, op.operands[0]), _get(ssa, op.operands[1])
         )
     elif op.name == "tt.load":
-        ssa[op.results[0].id] = builder.create_load(
-            _get(ssa, op.operands[0]),
-            ir.CACHE_MODIFIER.NONE,
-            ir.EVICTION_POLICY.NORMAL,
-            False,
-        )
+        _lower_load(builder, op, ssa)
     elif op.name == "tt.store":
         builder.create_store(
             _get(ssa, op.operands[0]),
@@ -230,6 +236,7 @@ def build_real_module(
     tmod: TTIRModule,
     limit: int | None = None,
     arithmetic_only: bool = False,
+    stop_after: str | None = None,
 ):
     """Build and verify a real Triton/MLIR module plus its SSA mapping."""
     ctx = tmod.ctx
@@ -267,6 +274,7 @@ def build_real_module(
             ops = ops[:limit]
         pending = list(ops)
         terminated = False
+        stopped = False
         while pending:
             progress = False
             next_pending = []
@@ -280,6 +288,9 @@ def build_real_module(
                     continue
                 try:
                     terminated = _lower_op(builder, op, ssa) or terminated
+                    if stop_after == op.name:
+                        stopped = True
+                        break
                 except NotImplementedError as exc:
                     if not arithmetic_only:
                         raise
@@ -305,7 +316,7 @@ def build_real_module(
                     for op in next_pending
                 )
                 raise RuntimeError("cannot resolve TTIR SSA dependencies: " + details)
-            pending = next_pending
+            pending = [] if stopped else next_pending
 
         if not terminated:
             builder.ret([])
@@ -320,11 +331,15 @@ def lower_ttir(
     ttir: str,
     limit: int | None = None,
     arithmetic_only: bool = False,
+    stop_after: str | None = None,
 ):
     """Parse TTIR and construct the verified real module."""
     from compiler.ttir_reader import parse_ttir
 
     tmod = parse_ttir(ttir)
     return tmod, *build_real_module(
-        tmod, limit=limit, arithmetic_only=arithmetic_only
+        tmod,
+        limit=limit,
+        arithmetic_only=arithmetic_only,
+        stop_after=stop_after,
     )

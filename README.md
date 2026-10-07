@@ -218,6 +218,18 @@ the Triton-value-to-MLIR-value SSA map.
 for the linear kernel. Unsupported operations fail explicitly rather than
 being silently dropped.
 
+To inspect the first memory-lowering stage in isolation, stop after the real
+Triton load operation:
+
+```bash
+PYTHONPATH=. python lower_real.py kernel.ttir --until tt.load --out linalg.mlir
+```
+
+The resulting module is printed and verified before later operations are
+considered. `tt.load` currently uses Triton's exposed real `create_load`
+constructor; standard `memref.load`/Linalg constructors are not exposed by the
+Triton 3.4.0 builder binding.
+
 The generated module should be parseable and verifiable by MLIR rather than simply being a printed list of operations.
 
 ### 3. Lower Core TTIR Operations
