@@ -11,7 +11,7 @@ map keyed by Triton's stable ``Value.id()``.
 """
 from __future__ import annotations
 
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable
 
 from triton._C.libtriton import ir
 
@@ -79,6 +79,28 @@ def _ops_in_order(tf: TFunc) -> Iterable[TOp]:
     return tf.body.ops
 
 
+def _lower_arithmetic(builder, op: TOp, ssa: Dict[int, object]):
+    if len(op.operands) != 2 or len(op.results) != 1:
+        raise RuntimeError(
+            "%s expects two operands and one result" % op.name
+        )
+    try:
+        lhs = ssa[op.operands[0].id]
+        rhs = ssa[op.operands[1].id]
+    except KeyError as exc:
+        raise RuntimeError(
+            "%s uses an SSA value that has not been lowered" % op.name
+        ) from exc
+
+    creators = {
+        "arith.muli": builder.create_mul,
+        "arith.mulf": builder.create_fmul,
+        "arith.addf": builder.create_fadd,
+    }
+    value = creators[op.name](lhs, rhs)
+    ssa[op.results[0].id] = value
+
+
 def build_real_module(tmod: TTIRModule, limit: int | None = None):
     """Build and verify a real Triton/MLIR module plus its SSA mapping."""
     ctx = tmod.ctx
@@ -103,14 +125,12 @@ def build_real_module(tmod: TTIRModule, limit: int | None = None):
         if limit is not None:
             ops = ops[:limit]
         for op in ops:
-            if op.name != "arith.constant":
-                continue
-            if len(op.results) != 1:
-                raise RuntimeError("arith.constant without one result")
-            ssa[op.results[0].id] = _constant(builder, op)
-            # One real operation is sufficient for this milestone; later
-            # milestones will consume the mapping for all TTIR operations.
-            break
+            if op.name == "arith.constant":
+                if len(op.results) != 1:
+                    raise RuntimeError("arith.constant without one result")
+                ssa[op.results[0].id] = _constant(builder, op)
+            elif op.name in {"arith.muli", "arith.mulf", "arith.addf"}:
+                _lower_arithmetic(builder, op, ssa)
 
         builder.ret([])
         fn.finalize()

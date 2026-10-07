@@ -21,7 +21,10 @@ The current pipeline successfully:
 structured reference paths. `lower_real.py` now also exercises the first real
 MLIR milestone through Triton 3.4.0's `libtriton.ir` bindings: it parses TTIR,
 creates a real `func.func` containing a typed `arith.constant`, builds an SSA
-map keyed by Triton `Value.id()`, prints the module, and verifies it.
+map keyed by Triton `Value.id()`, prints the module, and verifies it. The real
+path currently materializes `arith.constant`, `arith.muli`, `arith.mulf`, and
+`arith.addf`, preserving their operand connections through the Triton
+`Value.id()` SSA map.
 
 Example:
 
@@ -205,8 +208,8 @@ PYTHONPATH=. python lower_real.py kernel.ttir --limit 1
 ```
 
 This uses Triton's bundled MLIR bindings rather than assuming a standalone
-`mlir` Python package. Only `arith.constant` is materialized so far; the
-existing textual lowering remains the reference for subsequent operations.
+`mlir` Python package. Loads, pointers, reductions, and other TTIR operations
+remain deferred; the existing textual lowering remains the reference for them.
 
 The generated module should be parseable and verifiable by MLIR rather than simply being a printed list of operations.
 
