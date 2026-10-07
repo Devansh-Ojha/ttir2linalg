@@ -21,7 +21,6 @@ except FileNotFoundError as exc:
 tmod, mod, ssa, skipped = lower_ttir(
     ttir,
     limit=args.limit,
-    arithmetic_only=True,
 )
 print("[1] Triton parsed + verified: %d func(s), %d ops" % (len(tmod.funcs), len(tmod.all_ops)))
 print("[2] real MLIR module verified: OK")

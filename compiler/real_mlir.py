@@ -186,10 +186,14 @@ def _lower_op(builder, op: TOp, ssa: Dict[int, object]):
         insertion_point = builder.get_insertion_point()
         _lower_reduce(builder, op, ssa)
         builder.restore_insertion_point(insertion_point)
-    elif op.name in {"tt.reduce.return", "tt.return"}:
-        return
+    elif op.name == "tt.reduce.return":
+        return False
+    elif op.name == "tt.return":
+        builder.ret([])
+        return True
     else:
         raise NotImplementedError("unsupported TTIR operation %s" % op.name)
+    return False
 
 
 def _lower_reduce(builder, op: TOp, ssa: Dict[int, object]):
@@ -262,6 +266,7 @@ def build_real_module(
         if limit is not None:
             ops = ops[:limit]
         pending = list(ops)
+        terminated = False
         while pending:
             progress = False
             next_pending = []
@@ -274,7 +279,7 @@ def build_real_module(
                     progress = True
                     continue
                 try:
-                    _lower_op(builder, op, ssa)
+                    terminated = _lower_op(builder, op, ssa) or terminated
                 except NotImplementedError as exc:
                     if not arithmetic_only:
                         raise
@@ -302,7 +307,8 @@ def build_real_module(
                 raise RuntimeError("cannot resolve TTIR SSA dependencies: " + details)
             pending = next_pending
 
-        builder.ret([])
+        if not terminated:
+            builder.ret([])
         fn.finalize()
 
     if not module.verify():
