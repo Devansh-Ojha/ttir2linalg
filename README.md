@@ -17,7 +17,11 @@ The current pipeline successfully:
 - Writes the resulting representation to `linalg.mlir`
 - Includes a basic correctness test for the Triton linear kernel
 
-Current output is a textual intermediate representation rather than verified MLIR.
+`compiler/lower.py` and `compiler/linalg_lowering.py` remain the textual and
+structured reference paths. `lower_real.py` now also exercises the first real
+MLIR milestone through Triton 3.4.0's `libtriton.ir` bindings: it parses TTIR,
+creates a real `func.func` containing a typed `arith.constant`, builds an SSA
+map keyed by Triton `Value.id()`, prints the module, and verifies it.
 
 Example:
 
@@ -193,7 +197,16 @@ toward a representation containing the actual operands and type information.
 
 ### 2. Build real MLIR
 
-Replace the textual Linalg representation with actual MLIR operations.
+Replace the textual Linalg representation with actual MLIR operations. The
+first plumbing step is available via:
+
+```bash
+PYTHONPATH=. python lower_real.py kernel.ttir --limit 1
+```
+
+This uses Triton's bundled MLIR bindings rather than assuming a standalone
+`mlir` Python package. Only `arith.constant` is materialized so far; the
+existing textual lowering remains the reference for subsequent operations.
 
 The generated module should be parseable and verifiable by MLIR rather than simply being a printed list of operations.
 
