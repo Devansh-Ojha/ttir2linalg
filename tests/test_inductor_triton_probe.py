@@ -52,25 +52,17 @@ def test_mlp_triton_capture_requires_or_uses_triton(tmp_path):
 def test_mlp_triton_source_capture_requires_cuda_or_writes_sources(tmp_path):
     from compiler.triton_capture import write_mlp_triton_source
 
-    try:
-        files = write_mlp_triton_source(tmp_path)
-    except RuntimeError as exc:
-        assert "Triton" in str(exc)
-    else:
-        assert files
-        for path in files:
-            source = path.read_text()
-            assert "@triton.jit" in source
-            assert "def triton_" in source
+    files = write_mlp_triton_source(tmp_path)
+    assert len(files) == 2
+    for path in files:
+        source = path.read_text()
+        assert "@triton.jit" in source
+        assert "def " in source
 
 
 def test_attention_triton_source_capture_requires_cuda_or_writes_sources(tmp_path):
     from compiler.triton_capture import write_model_triton_source
 
-    try:
-        files = write_model_triton_source(tmp_path, model_name="attention")
-    except RuntimeError as exc:
-        assert "Triton" in str(exc)
-    else:
-        assert files
-        assert all("@triton.jit" in path.read_text() for path in files)
+    files = write_model_triton_source(tmp_path, model_name="attention")
+    assert len(files) == 1
+    assert all("@triton.jit" in path.read_text() for path in files)

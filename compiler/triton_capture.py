@@ -7,7 +7,7 @@ it does not allocate device tensors or execute a kernel.
 from __future__ import annotations
 
 import re
-import inspect
+import ast
 from pathlib import Path
 
 
@@ -66,23 +66,47 @@ def _explicit_model_triton_sources(model_name):
     authored as a target-independent model lowering and then can be compiled
     by Triton to obtain genuine TTIR.
     """
+    kernel_files = {
+        "mlp": (
+            Path(__file__).parent.parent / "kernels" / "mlp_ttir_kernels.py",
+            ("linear_relu_kernel", "linear_kernel"),
+        ),
+        "attention": (
+            Path(__file__).parent.parent / "kernels" / "attention_ttir_kernels.py",
+            ("attention_kernel",),
+        ),
+    }
     try:
-        if model_name == "mlp":
-            from kernels.mlp_ttir_kernels import linear_relu_kernel, linear_kernel
+        source_path, names = kernel_files[model_name]
+    except KeyError as exc:
+        raise ValueError("unsupported model %r" % model_name) from exc
+    return _read_kernel_sources(source_path, names)
 
-            kernels = (linear_relu_kernel, linear_kernel)
-        elif model_name == "attention":
-            from kernels.attention_ttir_kernels import attention_kernel
 
-            kernels = (attention_kernel,)
-        else:
-            raise ValueError("unsupported model %r" % model_name)
-        return [inspect.getsource(kernel) for kernel in kernels]
-    except ImportError as exc:
-        raise RuntimeError(
-            "CPU-only source capture needs Triton for the explicit lowering "
-            "path; no Triton package is installed"
-        ) from exc
+def _read_kernel_sources(path: Path, names: tuple[str, ...]) -> list[str]:
+    """Extract decorated Triton functions directly from their source file."""
+    source = path.read_text()
+    tree = ast.parse(source, filename=str(path))
+    functions = {
+        node.name: node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    lines = source.splitlines(keepends=True)
+    result = []
+    for name in names:
+        try:
+            node = functions[name]
+        except KeyError as exc:
+            raise RuntimeError(
+                "kernel %s is missing from %s" % (name, path)
+            ) from exc
+        start = min(
+            [decorator.lineno for decorator in node.decorator_list]
+            + [node.lineno]
+        ) - 1
+        result.append("".join(lines[start:node.end_lineno]).strip() + "\n")
+    return result
 
 
 def capture_mlp_triton_source(input_size=4, hidden_size=8, output_size=8):
@@ -104,7 +128,7 @@ def write_model_triton_source(
     )
     files = []
     for index, source in enumerate(sources):
-        match = re.search(r"def\s+(triton_[A-Za-z0-9_]+)", source)
+        match = re.search(r"def\s+([A-Za-z_][A-Za-z0-9_]*)", source)
         name = match.group(1) if match else "kernel_%d" % index
         target = output_dir / ("kernel_%d_%s.py" % (index, name))
         target.write_text(source)
