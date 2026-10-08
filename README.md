@@ -121,9 +121,11 @@ PYTHONPATH=. python mlp_pipeline.py \
 
 This uses PyTorch Inductor’s compiler-only `get_code` hook and writes the
 actual Triton kernel bodies emitted by Inductor. It never reconstructs source
-from the FX graph. The command requires an environment where Inductor can
-select its CUDA/Triton backend; on CPU-only machines it fails explicitly
-instead of writing substitute kernels.
+from the FX graph. When CUDA is available, the origin is reported as `inductor`. On CPU-only
+machines, the command uses the explicit Triton lowering path, reported as
+`explicit-triton-lowering`; it does not claim that these files came from
+Inductor. The source is still real Triton kernel source and can be passed to
+the Triton compiler without executing a device kernel.
 
 The same source stage accepts the small attention model:
 

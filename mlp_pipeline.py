@@ -128,7 +128,10 @@ def main():
     sample = sample.to(device)
     graph, compiled, numerical_match, status, compile_mode = capture(model, sample)
     if args.compile_mlp_triton_source or args.compile_triton_source:
-        from compiler.triton_capture import write_model_triton_source
+        from compiler.triton_capture import (
+            model_triton_source_origin,
+            write_model_triton_source,
+        )
 
         source_dir = args.triton_dir or Path("mlp-triton")
         files = write_model_triton_source(
@@ -145,6 +148,7 @@ def main():
             "triton_source_dir": str(source_dir),
             "triton_source_count": len(files),
             "triton_source_files": [str(path) for path in files],
+            "triton_source_origin": model_triton_source_origin(),
         }, indent=2))
         return
     ttir_paths = list(args.ttir)
@@ -160,19 +164,17 @@ def main():
         ttir_paths.append(ttir_path)
     compiled_mlp = False
     if args.compile_mlp_triton or args.compile_model_triton:
-        from compiler.triton_capture import write_mlp_ttir
+        from compiler.triton_capture import write_model_ttir
 
-        if args.model != "mlp":
-            raise RuntimeError(
-                "direct TTIR artifact capture currently supports --model mlp; "
-                "attention requires Inductor Triton source capture first"
-            )
         ttir_dir = args.ttir_dir or Path("mlp-ttir")
-        ttir_paths.extend(write_mlp_ttir(
+        ttir_paths.extend(write_model_ttir(
             ttir_dir,
+            model_name=args.model,
             input_size=args.input_size,
             hidden_size=args.hidden_size,
             output_size=args.output_size,
+            sequence_length=args.sequence_length,
+            embed_size=args.embed_size,
         ))
         compiled_mlp = True
     if args.ttir_dir and not compiled_mlp:

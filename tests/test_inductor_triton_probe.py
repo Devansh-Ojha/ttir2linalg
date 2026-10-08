@@ -55,7 +55,7 @@ def test_mlp_triton_source_capture_requires_cuda_or_writes_sources(tmp_path):
     try:
         files = write_mlp_triton_source(tmp_path)
     except RuntimeError as exc:
-        assert "Inductor Triton source capture" in str(exc)
+        assert "Triton" in str(exc)
     else:
         assert files
         for path in files:
@@ -70,7 +70,7 @@ def test_attention_triton_source_capture_requires_cuda_or_writes_sources(tmp_pat
     try:
         files = write_model_triton_source(tmp_path, model_name="attention")
     except RuntimeError as exc:
-        assert "Inductor Triton source capture" in str(exc)
+        assert "Triton" in str(exc)
     else:
         assert files
         assert all("@triton.jit" in path.read_text() for path in files)

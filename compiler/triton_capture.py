@@ -7,6 +7,7 @@ it does not allocate device tensors or execute a kernel.
 from __future__ import annotations
 
 import re
+import inspect
 from pathlib import Path
 
 
@@ -37,10 +38,7 @@ def capture_model_triton_source(
 
     import torch
     if not torch.cuda.is_available():
-        raise RuntimeError(
-            "Inductor Triton source capture requires a CUDA/Triton backend; "
-            "no CUDA device is available"
-        )
+        return _explicit_model_triton_sources(model_name)
     if model_name == "mlp":
         from model.mlp import SimpleMLP
 
@@ -59,6 +57,32 @@ def capture_model_triton_source(
     compiled = torch.compile(model, backend="inductor")
     source_codes = get_code(compiled, sample)
     return _triton_sources_from_inductor_code(source_codes)
+
+
+def _explicit_model_triton_sources(model_name):
+    """Return source from the project's explicit Triton lowering path.
+
+    This is intentionally not labeled as Inductor output. The kernel source is
+    authored as a target-independent model lowering and then can be compiled
+    by Triton to obtain genuine TTIR.
+    """
+    try:
+        if model_name == "mlp":
+            from kernels.mlp_ttir_kernels import linear_relu_kernel, linear_kernel
+
+            kernels = (linear_relu_kernel, linear_kernel)
+        elif model_name == "attention":
+            from kernels.attention_ttir_kernels import attention_kernel
+
+            kernels = (attention_kernel,)
+        else:
+            raise ValueError("unsupported model %r" % model_name)
+        return [inspect.getsource(kernel) for kernel in kernels]
+    except ImportError as exc:
+        raise RuntimeError(
+            "CPU-only source capture needs Triton for the explicit lowering "
+            "path; no Triton package is installed"
+        ) from exc
 
 
 def capture_mlp_triton_source(input_size=4, hidden_size=8, output_size=8):
@@ -88,13 +112,22 @@ def write_model_triton_source(
     return files
 
 
+def model_triton_source_origin():
+    import torch
+
+    return "inductor" if torch.cuda.is_available() else "explicit-triton-lowering"
+
+
 def write_mlp_triton_source(path, input_size=4, hidden_size=8, output_size=8):
     return write_model_triton_source(
         path, "mlp", input_size, hidden_size, output_size
     )
 
 
-def _compile_kernel(kernel, input_size: int, output_size: int) -> str:
+def _compile_kernel(
+    kernel, input_size: int | None = None, output_size: int | None = None,
+    signature=None, constexprs=None,
+) -> str:
     try:
         from triton.backends.compiler import GPUTarget
         from triton.compiler import ASTSource, compile as triton_compile
@@ -106,15 +139,12 @@ def _compile_kernel(kernel, input_size: int, output_size: int) -> str:
 
     source = ASTSource(
         kernel,
-        signature={
-            "x_ptr": "*fp32",
-            "weight_ptr": "*fp32",
-            "bias_ptr": "*fp32",
-            "output_ptr": "*fp32",
+        signature=signature or {
+            "x_ptr": "*fp32", "weight_ptr": "*fp32",
+            "bias_ptr": "*fp32", "output_ptr": "*fp32",
         },
-        constexprs={
-            "INPUT_SIZE": input_size,
-            "OUTPUT_SIZE": output_size,
+        constexprs=constexprs or {
+            "INPUT_SIZE": input_size, "OUTPUT_SIZE": output_size,
         },
     )
     compiled = triton_compile(
@@ -172,6 +202,29 @@ def compile_mlp_ttir(input_size: int = 4, hidden_size: int = 8,
     )
 
 
+def compile_attention_ttir(sequence_length=4, embed_size=8):
+    try:
+        from kernels.attention_ttir_kernels import attention_kernel
+    except ImportError as exc:
+        raise RuntimeError(
+            "Triton 3.4.0 is required for direct attention TTIR capture"
+        ) from exc
+    return [(
+        "attention",
+        _compile_kernel(
+            attention_kernel,
+            signature={
+                "q_ptr": "*fp32", "k_ptr": "*fp32",
+                "v_ptr": "*fp32", "output_ptr": "*fp32",
+            },
+            constexprs={
+                "SEQUENCE_LENGTH": sequence_length,
+                "EMBED_SIZE": embed_size,
+            },
+        ),
+    )]
+
+
 def write_mlp_ttir(path, input_size=4, hidden_size=8, output_size=8):
     """Write and libtriton-verify one TTIR file for each MLP stage."""
     from pathlib import Path
@@ -182,6 +235,31 @@ def write_mlp_ttir(path, input_size=4, hidden_size=8, output_size=8):
     artifacts = compile_mlp_ttir(input_size, hidden_size, output_size)
     from compiler.ttir_reader import parse_ttir
 
+    for index, (name, text) in enumerate(artifacts):
+        parsed = parse_ttir(text)
+        if not parsed.mod.verify():
+            raise RuntimeError("libtriton.ir rejected TTIR for %s" % name)
+        artifact = output_dir / ("kernel_%d_%s.ttir" % (index, name))
+        artifact.write_text(text)
+        files.append(artifact)
+    return files
+
+
+def write_model_ttir(
+    path, model_name="mlp", input_size=4, hidden_size=8, output_size=8,
+    sequence_length=4, embed_size=8,
+):
+    if model_name == "mlp":
+        artifacts = compile_mlp_ttir(input_size, hidden_size, output_size)
+    elif model_name == "attention":
+        artifacts = compile_attention_ttir(sequence_length, embed_size)
+    else:
+        raise ValueError("unsupported model %r" % model_name)
+    output_dir = Path(path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    from compiler.ttir_reader import parse_ttir
+
+    files = []
     for index, (name, text) in enumerate(artifacts):
         parsed = parse_ttir(text)
         if not parsed.mod.verify():
