@@ -17,6 +17,7 @@ from pathlib import Path
 import torch
 
 from compiler.hgir_from_fx import from_exported_graph, from_fx_graph
+from model.attention import SimpleAttention
 from model.mlp import SimpleMLP
 
 
@@ -51,11 +52,27 @@ def capture(model, sample):
     return graph, compiled, numerical_match, compile_status, compile_mode
 
 
+def create_model(args):
+    if args.model == "mlp":
+        return (
+            SimpleMLP(args.input_size, args.hidden_size, args.output_size),
+            torch.randn(1, args.input_size),
+        )
+    return (
+        SimpleAttention(args.embed_size, args.num_heads),
+        torch.randn(1, args.sequence_length, args.embed_size),
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model", choices=("mlp", "attention"), default="mlp")
     parser.add_argument("--input-size", type=int, default=4)
     parser.add_argument("--hidden-size", type=int, default=8)
     parser.add_argument("--output-size", type=int, default=8)
+    parser.add_argument("--sequence-length", type=int, default=4)
+    parser.add_argument("--embed-size", type=int, default=8)
+    parser.add_argument("--num-heads", type=int, default=2)
     parser.add_argument(
         "--ttir",
         type=Path,
@@ -82,7 +99,17 @@ def main():
     parser.add_argument(
         "--compile-mlp-triton-source",
         action="store_true",
+        help="capture Triton source emitted by PyTorch Inductor (legacy alias)",
+    )
+    parser.add_argument(
+        "--compile-triton-source",
+        action="store_true",
         help="capture Triton source emitted by PyTorch Inductor",
+    )
+    parser.add_argument(
+        "--compile-model-triton",
+        action="store_true",
+        help="compile the selected model's direct Triton artifact family",
     )
     parser.add_argument(
         "--triton-dir",
@@ -96,18 +123,23 @@ def main():
 
     torch.manual_seed(0)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = SimpleMLP(args.input_size, args.hidden_size, args.output_size).to(device)
-    sample = torch.randn(1, args.input_size, device=device)
+    model, sample = create_model(args)
+    model = model.to(device)
+    sample = sample.to(device)
     graph, compiled, numerical_match, status, compile_mode = capture(model, sample)
-    if args.compile_mlp_triton_source:
-        from compiler.triton_capture import write_mlp_triton_source
+    if args.compile_mlp_triton_source or args.compile_triton_source:
+        from compiler.triton_capture import write_model_triton_source
 
         source_dir = args.triton_dir or Path("mlp-triton")
-        files = write_mlp_triton_source(
+        files = write_model_triton_source(
             source_dir,
+            model_name=args.model,
             input_size=args.input_size,
             hidden_size=args.hidden_size,
             output_size=args.output_size,
+            sequence_length=args.sequence_length,
+            embed_size=args.embed_size,
+            num_heads=args.num_heads,
         )
         print(json.dumps({
             "triton_source_dir": str(source_dir),
@@ -127,9 +159,14 @@ def main():
         )
         ttir_paths.append(ttir_path)
     compiled_mlp = False
-    if args.compile_mlp_triton:
+    if args.compile_mlp_triton or args.compile_model_triton:
         from compiler.triton_capture import write_mlp_ttir
 
+        if args.model != "mlp":
+            raise RuntimeError(
+                "direct TTIR artifact capture currently supports --model mlp; "
+                "attention requires Inductor Triton source capture first"
+            )
         ttir_dir = args.ttir_dir or Path("mlp-ttir")
         ttir_paths.extend(write_mlp_ttir(
             ttir_dir,

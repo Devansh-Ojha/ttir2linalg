@@ -36,3 +36,16 @@ def test_ttir_mlp_hgir():
     assert "=== HGIR kernel" in out
     assert "linear" in out
     assert any(name in out for name in ("maximum", "compare", "select", "relu"))
+
+
+def test_attention_cpu_compile():
+    result = subprocess.run(
+        [sys.executable, "mlp_pipeline.py", "--model", "attention"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    out = result.stdout
+    assert "graph exported_mlp {" in out
+    assert '"torch_compile": true' in out
+    assert '"numerical_match": true' in out

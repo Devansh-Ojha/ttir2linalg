@@ -25,7 +25,10 @@ def _triton_sources_from_inductor_code(source_codes):
     return sources
 
 
-def capture_mlp_triton_source(input_size=4, hidden_size=8, output_size=8):
+def capture_model_triton_source(
+    model_name="mlp", input_size=4, hidden_size=8, output_size=8,
+    sequence_length=4, embed_size=8, num_heads=2,
+):
     """Return Triton source emitted by Inductor without compiling or launching."""
     try:
         from torch._inductor.utils import get_code
@@ -33,25 +36,48 @@ def capture_mlp_triton_source(input_size=4, hidden_size=8, output_size=8):
         raise RuntimeError("this PyTorch build has no Inductor source hook") from exc
 
     import torch
-    from model.mlp import SimpleMLP
-
     if not torch.cuda.is_available():
         raise RuntimeError(
             "Inductor Triton source capture requires a CUDA/Triton backend; "
             "no CUDA device is available"
         )
-    model = SimpleMLP(input_size, hidden_size, output_size).eval().cuda()
-    sample = torch.randn(1, input_size, device="cuda")
+    if model_name == "mlp":
+        from model.mlp import SimpleMLP
+
+        model = SimpleMLP(input_size, hidden_size, output_size).eval().cuda()
+        sample = torch.randn(1, input_size, device="cuda")
+    elif model_name == "attention":
+        from model.attention import SimpleAttention
+
+        model = SimpleAttention(embed_size, num_heads).eval().cuda()
+        sample = torch.randn(
+            1, sequence_length, embed_size, device="cuda"
+        )
+    else:
+        raise ValueError("unsupported model %r" % model_name)
+
     compiled = torch.compile(model, backend="inductor")
     source_codes = get_code(compiled, sample)
     return _triton_sources_from_inductor_code(source_codes)
 
 
-def write_mlp_triton_source(path, input_size=4, hidden_size=8, output_size=8):
+def capture_mlp_triton_source(input_size=4, hidden_size=8, output_size=8):
+    return capture_model_triton_source(
+        "mlp", input_size, hidden_size, output_size
+    )
+
+
+def write_model_triton_source(
+    path, model_name="mlp", input_size=4, hidden_size=8, output_size=8,
+    sequence_length=4, embed_size=8, num_heads=2,
+):
     """Write one file per Triton kernel emitted by Inductor."""
     output_dir = Path(path)
     output_dir.mkdir(parents=True, exist_ok=True)
-    sources = capture_mlp_triton_source(input_size, hidden_size, output_size)
+    sources = capture_model_triton_source(
+        model_name, input_size, hidden_size, output_size,
+        sequence_length, embed_size, num_heads,
+    )
     files = []
     for index, source in enumerate(sources):
         match = re.search(r"def\s+(triton_[A-Za-z0-9_]+)", source)
@@ -60,6 +86,12 @@ def write_mlp_triton_source(path, input_size=4, hidden_size=8, output_size=8):
         target.write_text(source)
         files.append(target)
     return files
+
+
+def write_mlp_triton_source(path, input_size=4, hidden_size=8, output_size=8):
+    return write_model_triton_source(
+        path, "mlp", input_size, hidden_size, output_size
+    )
 
 
 def _compile_kernel(kernel, input_size: int, output_size: int) -> str:

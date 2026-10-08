@@ -125,6 +125,41 @@ from the FX graph. The command requires an environment where Inductor can
 select its CUDA/Triton backend; on CPU-only machines it fails explicitly
 instead of writing substitute kernels.
 
+The same source stage accepts the small attention model:
+
+```bash
+PYTHONPATH=. python mlp_pipeline.py \
+  --model attention \
+  --compile-triton-source \
+  --triton-dir attention-triton
+```
+
+On a Triton-capable environment, use the generated source as the input to the
+next compiler stage and capture/verify its TTIR artifacts with the existing
+Triton compiler workflow. CPU-only machines can still run
+`PYTHONPATH=. python mlp_pipeline.py --model attention` to verify the
+`torch.compile` graph path; they cannot produce genuine Inductor Triton
+artifacts because CPU Inductor selects its C++ backend.
+
+## Model pipelines and next steps
+
+Both model paths are intended to follow:
+
+```text
+PyTorch -> torch.compile -> Triton source -> Triton compiler -> TTIR
+```
+
+TTIR is the compiler intermediate representation between the model/compiler
+stack and future hardware-specific lowering. No hardware backend is included
+yet.
+
+Next steps:
+
+1. Scale to larger attention and VLA-style models.
+2. Improve extraction of the complete generated Triton program.
+3. Represent multiple TTIR kernels as one model-level graph.
+4. Lower the TTIR/model representation to hardware-specific targets.
+
 The direct capture entry point is also runnable by itself:
 
 ```bash

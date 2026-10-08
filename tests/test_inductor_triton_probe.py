@@ -62,3 +62,15 @@ def test_mlp_triton_source_capture_requires_cuda_or_writes_sources(tmp_path):
             source = path.read_text()
             assert "@triton.jit" in source
             assert "def triton_" in source
+
+
+def test_attention_triton_source_capture_requires_cuda_or_writes_sources(tmp_path):
+    from compiler.triton_capture import write_model_triton_source
+
+    try:
+        files = write_model_triton_source(tmp_path, model_name="attention")
+    except RuntimeError as exc:
+        assert "Inductor Triton source capture" in str(exc)
+    else:
+        assert files
+        assert all("@triton.jit" in path.read_text() for path in files)
