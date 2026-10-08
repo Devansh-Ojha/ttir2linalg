@@ -1,455 +1,96 @@
-# TTIR to Linalg
+# PyTorch to Triton/TTIR
 
-A compiler experiment for lowering Triton IR (TTIR) into a Linalg-based intermediate representation.
+This project demonstrates two small model paths:
 
-The project starts from Triton kernels, extracts TTIR using Triton's compiler infrastructure, parses the resulting MLIR, and walks the TTIR operations to build a Linalg-oriented representation. The long-term goal is to lower Triton GPU kernels into standard MLIR/Linalg operations that can be further transformed and lowered through the MLIR ecosystem.
-
-## Current Status
-
-The current pipeline successfully:
-
-- Compiles a Triton kernel with Triton 3.4.0
-- Extracts the generated TTIR from `CompiledKernel.asm["ttir"]`
-- Parses TTIR using Triton's `libtriton` bindings
-- Walks the parsed TTIR module and operations
-- Maps the current set of TTIR operations to a Linalg-oriented representation
-- Handles nested `tt.reduce` regions and `tt.reduce.return`
-- Writes the resulting representation to `linalg.mlir`
-- Includes a basic correctness test for the Triton linear kernel
-
-## Hardware-agnostic MLP pipeline
-
-`mlp_pipeline.py` captures a small PyTorch MLP with `torch.export` and converts
-its FX dataflow into the project-owned hardware-agnostic IR in
-`compiler/hgir.py`. The IR contains typed values, tensor shapes, dependencies,
-and target-independent operations such as `linear` and `relu`; it does not
-encode Triton layouts, warps, or address spaces.
-
-The same command uses a `torch.compile` callback to capture the generated FX
-graph and checks its result against eager PyTorch without requiring CUDA, an
-NVIDIA driver, or Triton execution. A TTIR artifact from the target
-environment can be converted through the existing TTIR parser with `--ttir`:
-
-```bash
-PYTHONPATH=. python mlp_pipeline.py --out mlp.hgir
-PYTHONPATH=. python mlp_pipeline.py --ttir path/to/kernel.ttir --out kernel.hgir
+```text
+PyTorch model -> torch.compile graph capture -> Triton kernel source
+PyTorch model -> explicit Triton kernels -> Triton compiler -> verified TTIR
 ```
 
-For a compiled MLP with multiple Triton kernels, pass every captured artifact
-or a directory. HGIR is generated from these TTIR modules, not from the FX
-graph:
+The supported models are:
+
+- `mlp`: FC1 + ReLU + FC2
+- `attention`: Q/K/V attention with an output projection
+
+## Setup
+
+Use Python 3.9+ and install the dependencies in the target environment:
+
+```bash
+python -m pip install torch
+python -m pip install triton==3.4.0
+```
+
+Triton is required for genuine `.ttir` generation. CUDA execution is not
+required; the compiler target is used only to produce compiler artifacts.
+
+## Run the Triton-source stage
+
+On a CPU-only machine this uses the project's explicit `@triton.jit` kernel
+definitions. It does not claim that CPU Inductor generated Triton source and
+does not reconstruct source from the FX graph.
 
 ```bash
 PYTHONPATH=. python mlp_pipeline.py \
-  --ttir-dir path/to/mlp-ttir \
-  --out mlp.hgir
-```
-
-The output contains one verified HGIR graph per kernel, preserving kernel
-ordering, SSA dependencies, memory operations, shapes/types, and nested
-reduction regions. Linear kernels are classified from their reduction
-structure; elementwise kernels remain neutral operation graphs and can be
-identified from their captured kernel names/operations.
-
-In a Triton environment, a representative linear kernel can be compiled to
-TTIR without launching it:
-
-```bash
-PYTHONPATH=. python mlp_pipeline.py \
-  --compile-triton \
-  --ttir-out mlp_linear.ttir \
-  --out mlp_linear.hgir
-```
-
-The `cuda` target passed to Triton is confined to this optional artifact
-capture boundary. The resulting HGIR uses neutral names such as `buffer`,
-`range`, `load`, `reduce`, and `partition_id`; it does not retain Triton
-pointer types or CUDA layout details.
-
-The exported FX graph is the stable front-end contract. Inductor's generated
-Triton source and TTIR files are compiler-cache/debug artifacts and are
-therefore accepted as an optional input rather than assumed to have a stable
-Python hook. In the current local environment, CPU Inductor is available but
-the Triton Python package is not installed; no CPU Triton backend is exposed.
-Triton TTIR therefore requires either a target environment with Triton or a
-previously captured `.ttir` artifact, while the FX-to-HGIR path remains fully
-CPU-only.
-
-To inspect this boundary without changing the pipeline, run:
-
-```bash
-PYTHONPATH=. python -m compiler.inductor_triton_probe
-```
-
-The probe reports the exact representation obtained. On a CPU-only install it
-reports `representation: "fx_graph"` and `ttir_obtained: false`; this is a
-real `torch.compile` compiler-callback graph, not fabricated TTIR. The
-existing direct Triton compiler path remains available in environments where
-the Triton package is installed:
-
-```bash
-PYTHONPATH=. python mlp_pipeline.py --compile-triton \
-  --ttir-out mlp_linear.ttir --out mlp_linear.hgir
-```
-
-That command compiles the representative Triton kernel to genuine TTIR
-without launching it. CPU `torch.compile` itself cannot lower to TTIR when
-Inductor selects its `cpp` backend.
-
-To capture the complete two-stage MLP representation as genuine TTIR:
-
-```bash
-PYTHONPATH=. python mlp_pipeline.py \
-  --compile-mlp-triton \
-  --ttir-dir mlp-ttir \
-  --out mlp.hgir
-```
-
-This writes `kernel_0_fc1_relu.ttir` and `kernel_1_fc2.ttir`. Each file is
-returned by Triton's compiler as `compiled.asm["ttir"]`, parsed with the
-existing Triton bindings, and verified before HGIR conversion. The kernels
-are compiler artifacts only; they are never launched.
-
-Inductor-generated Triton source is a separate stage and does not run Triton’s
-compiler:
-
-```bash
-PYTHONPATH=. python mlp_pipeline.py \
-  --compile-mlp-triton-source \
+  --model mlp \
+  --compile-triton-source \
   --triton-dir mlp-triton
-```
 
-This uses PyTorch Inductor’s compiler-only `get_code` hook and writes the
-actual Triton kernel bodies emitted by Inductor. It never reconstructs source
-from the FX graph. When CUDA is available, the origin is reported as `inductor`. On CPU-only
-machines, the command uses the explicit Triton lowering path, reported as
-`explicit-triton-lowering`; it does not claim that these files came from
-Inductor. The source is still real Triton kernel source and can be passed to
-the Triton compiler without executing a device kernel.
-
-The same source stage accepts the small attention model:
-
-```bash
 PYTHONPATH=. python mlp_pipeline.py \
   --model attention \
   --compile-triton-source \
   --triton-dir attention-triton
 ```
 
-On a Triton-capable environment, use the generated source as the input to the
-next compiler stage and capture/verify its TTIR artifacts with the existing
-Triton compiler workflow. CPU-only machines can still run
-`PYTHONPATH=. python mlp_pipeline.py --model attention` to verify the
-`torch.compile` graph path; they cannot produce genuine Inductor Triton
-artifacts because CPU Inductor selects its C++ backend.
-
-## Model pipelines and next steps
-
-Both model paths are intended to follow:
+Expected source files:
 
 ```text
-PyTorch -> torch.compile -> Triton source -> Triton compiler -> TTIR
+mlp-triton/kernel_0_linear_relu_kernel.py
+mlp-triton/kernel_1_linear_kernel.py
+attention-triton/kernel_0_attention_kernel.py
 ```
 
-TTIR is the compiler intermediate representation between the model/compiler
-stack and future hardware-specific lowering. No hardware backend is included
-yet.
+The source-only stage works without Triton installed because it reads the
+kernel definitions directly from `kernels/`.
 
-Next steps:
+## Run the Triton-to-TTIR stage
 
-1. Scale to larger attention and VLA-style models.
-2. Improve extraction of the complete generated Triton program.
-3. Represent multiple TTIR kernels as one model-level graph.
-4. Lower the TTIR/model representation to hardware-specific targets.
-
-The direct capture entry point is also runnable by itself:
+These commands compile the real Triton kernels, write one `.ttir` file per
+kernel, parse each file with Triton's `libtriton.ir`, and verify it before
+writing HGIR.
 
 ```bash
-PYTHONPATH=. python -m compiler.triton_capture \
-  --out mlp_linear_relu.ttir
+PYTHONPATH=. python mlp_pipeline.py \
+  --model mlp \
+  --compile-model-triton \
+  --ttir-dir mlp-ttir \
+  --out mlp.hgir
+
+PYTHONPATH=. python mlp_pipeline.py \
+  --model attention \
+  --compile-model-triton \
+  --ttir-dir attention-ttir \
+  --out attention.hgir
 ```
 
-It compiles a real fused linear+ReLU Triton kernel with
-`ASTSource`/`GPUTarget`, writes `compiled.asm["ttir"]`, parses the text through
-the existing `libtriton.ir` reader, and verifies the parsed module. No device
-tensors are allocated and no kernel is launched. If Triton is absent, the
-command fails explicitly rather than producing substitute TTIR.
-
-`compiler/lower.py` and `compiler/linalg_lowering.py` remain the textual and
-structured reference paths. `lower_real.py` now also exercises the first real
-MLIR milestone through Triton 3.4.0's `libtriton.ir` bindings: it parses TTIR,
-creates a real `func.func`, builds an SSA map keyed by Triton `Value.id()`,
-prints the module, and verifies it. The real path materializes arithmetic,
-pointer, memory, range, reshape, and reduction operations using Triton
-3.4.0's operation builders; no operation is emitted as a placeholder string.
-
-Example:
+Expected TTIR files:
 
 ```text
-%c4_i32 = linalg.constant
-
-%0 = linalg.program_id
-
-%1 = linalg.index_range
-
-%2 = linalg.broadcast
-
-%3 = linalg.pointer_add
-
-%4 = linalg.load
-
-...
-
-%14 = linalg.reduce
-
-%17 = linalg.add
-
-    linalg.reduce_yield
-
-%15 = linalg.add
-
-%16 = linalg.pointer_add
-
-linalg.store
-
-linalg.return
+mlp-ttir/kernel_0_fc1_relu.ttir
+mlp-ttir/kernel_1_fc2.ttir
+attention-ttir/kernel_0_attention.ttir
 ```
 
-## Project Structure
-
-```text
-ttir2linalg/
-├── compiler/
-│   ├── lower.py
-│   └── mlir_builder.py
-├── kernels/
-│   └── mlp_kernel.py
-├── tests/
-│   └── test_linear.py
-├── dump_ttir.py
-├── linalg.mlir
-└── README.md
-```
-
-## Triton Kernel
-
-The initial kernel is a small linear layer implemented in Triton. It computes the dot product between an input vector and a row of weights, adds a bias, and writes the result.
-
-The kernel is used as a small but representative test case for exercising:
-
-- program IDs
-- pointer arithmetic
-- tensor construction
-- loads and stores
-- elementwise arithmetic
-- reshapes
-- reductions
-- nested TTIR regions
-
-The reference implementation is compared against the equivalent PyTorch `nn.Linear` computation.
-
-## Environment
-
-Development and testing has been done on:
-
-- Berkeley EECS EDA machines
-- RHEL 9
-- x86-64
-- Python 3.9
-- PyTorch 2.8.0
-- Triton 3.4.0
-
-## Setup
-
-```bash
-ssh eda-*
-
-python3 -m venv ~/ttir-env
-source ~/ttir-env/bin/activate
-
-python -m pip install --upgrade pip
-python -m pip install torch triton numpy
-```
-
-Verify the environment:
-
-```bash
-python -c "import torch, triton; print(torch.__version__); print(triton.__version__)"
-```
-
-## Running the Kernel
-
-Run the Triton kernel in interpreter mode:
-
-```bash
-PYTHONPATH=. TRITON_INTERPRET=1 python kernels/mlp_kernel.py
-```
-
-## Generating TTIR
-
-Generate the TTIR for the kernel:
-
-```bash
-PYTHONPATH=. python dump_ttir.py
-```
-
-The Triton compiler also exposes TTIR directly through:
-
-```python
-result.asm["ttir"]
-```
-
-The lowering pipeline uses this representation rather than reparsing a dumped file.
-
-## TTIR → Linalg
-
-Run the current lowering pass with:
-
-```bash
-PYTHONPATH=. python compiler/lower.py
-```
-
-This prints the lowered operations and writes:
-
-```text
-linalg.mlir
-```
-
-The current output is an intermediate textual representation. It is intentionally separate from actual MLIR construction at this stage.
-
-## Tests
-
-The current test can be run directly with:
-
-```bash
-PYTHONPATH=. python tests/test_linear.py
-```
-
-Expected output:
-
-```text
-PASS
-```
-
-`pytest` is not currently required by the test suite.
-
-## Roadmap
-
-### 1. Preserve TTIR semantics
-
-Replace the current operation-name-only lowering with structured operations that preserve:
-
-- operands
-- results
-- types
-- attributes
-- tensor shapes
-- reduction axes
-- nested regions
-
-For example, move from:
-
-```text
-%12 = linalg.mul
-```
-
-toward a representation containing the actual operands and type information.
-
-### 2. Build real MLIR
-
-Replace the textual Linalg representation with actual MLIR operations. The
-first plumbing step is available via:
-
-```bash
-PYTHONPATH=. python lower_real.py kernel.ttir --limit 1
-```
-
-This uses Triton's bundled MLIR bindings rather than assuming a standalone
-`mlir` Python package. The generated module is currently Triton-dialect MLIR;
-the existing textual Linalg lowering remains available as a semantic reference
-until equivalent Linalg dialect construction is exposed by the target runtime.
-The current real-IR milestone lowers `arith.muli`, `arith.mulf`, `arith.addf`,
-`tt.make_range`, and `tt.reshape` through typed builder APIs while preserving
-the Triton-value-to-MLIR-value SSA map.
-
-`lower_real.py` runs the complete currently implemented real-IR lowering path
-for the linear kernel. Unsupported operations fail explicitly rather than
-being silently dropped.
-
-The real path uses Triton's exposed `create_load` constructor. Standard
-`memref.load`, Linalg, Tensor, and generic MLIR operation constructors are not
-exposed by the bundled Triton 3.4.0 Python binding.
-
-The generated module should be parseable and verifiable by MLIR rather than simply being a printed list of operations.
-
-### 3. Lower Core TTIR Operations
-
-Implement structured lowering for the core operations used by Triton kernels:
-
-- `tt.make_range`
-- `tt.splat`
-- `tt.addptr`
-- `tt.load`
-- `tt.store`
-- `arith.*`
-- `tt.reshape`
-- `tt.reduce`
-- `tt.get_program_id`
-
-### 4. Handle Tensor Semantics
-
-Map Triton's tensor semantics onto appropriate MLIR/Linalg representations, including:
-
-- shaped tensors
-- elementwise operations
-- broadcasting
-- indexing
-- reductions
-- memory accesses
-
-### 5. Verification
-
-Add structural and numerical tests that compare:
-
-```text
-Triton kernel
-      vs.
-Lowered representation
-      vs.
-PyTorch reference
-```
-
-The goal is to catch semantic mismatches rather than only checking that lowering succeeds.
-
-### 6. Expand Kernel Coverage
-
-Move beyond the initial linear kernel and add progressively more representative kernels:
-
-- elementwise kernels
-- reductions
-- matrix multiplication
-- softmax
-- MLP layers
-- fused operations
-
-### 7. MLIR Lowering Pipeline
-
-Once valid Linalg IR is produced, connect the output to standard MLIR transformations and lower it toward lower-level dialects.
-
-The eventual pipeline is:
-
-```text
-Triton Python
-     ↓
-TTIR
-     ↓
-TTIR → Linalg
-     ↓
-MLIR / Linalg
-     ↓
-MLIR transformations
-     ↓
-Lower-level IR
-```
-
-## Design Goal
+## Working now
+
+- MLP and attention models capture and numerically check with CPU
+  `torch.compile`.
+- MLP and attention produce explicit Triton kernel source files.
+- Triton 3.4.0 produces genuine, parseable, verified TTIR for both model
+  kernel families.
+- TTIR can be converted into the project's hardware-agnostic HGIR.
+- No CUDA kernel execution or hardware-specific backend is included.
+
+The checked-in source artifacts in `mlp-triton/` and `attention-triton/` are
+the outputs of the source-stage commands above. Generate `.ttir` artifacts in
+an environment with Triton 3.4.0 using the second set of commands.
