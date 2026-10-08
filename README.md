@@ -81,16 +81,6 @@ mlp-ttir/kernel_1_fc2.ttir
 attention-ttir/kernel_0_attention.ttir
 ```
 
-## Working now
-
-- MLP and attention models capture and numerically check with CPU
-  `torch.compile`.
-- MLP and attention produce explicit Triton kernel source files.
-- Triton 3.4.0 produces genuine, parseable, verified TTIR for both model
-  kernel families.
-- TTIR can be converted into the project's hardware-agnostic HGIR.
-- No CUDA kernel execution or hardware-specific backend is included.
-
 The checked-in source artifacts in `mlp-triton/` and `attention-triton/` are
 the outputs of the source-stage commands above. Generate `.ttir` artifacts in
 an environment with Triton 3.4.0 using the second set of commands.
