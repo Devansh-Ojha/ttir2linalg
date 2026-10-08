@@ -95,6 +95,7 @@ def _lower_arithmetic(builder, op: TOp, ssa: Dict[int, object]):
         "arith.muli": builder.create_mul,
         "arith.mulf": builder.create_fmul,
         "arith.addf": builder.create_fadd,
+        "arith.maxnumf": builder.create_maxnumf,
     }
     value = creators[op.name](lhs, rhs)
     ssa[op.results[0].id] = value
@@ -160,7 +161,7 @@ def _lower_op(builder, op: TOp, ssa: Dict[int, object]):
         if len(op.results) != 1:
             raise RuntimeError("arith.constant without one result")
         ssa[op.results[0].id] = _constant(builder, op)
-    elif op.name in {"arith.muli", "arith.mulf", "arith.addf"}:
+    elif op.name in {"arith.muli", "arith.mulf", "arith.addf", "arith.maxnumf"}:
         _lower_arithmetic(builder, op, ssa)
     elif op.name == "tt.get_program_id":
         ssa[op.results[0].id] = builder.create_get_program_id(
@@ -221,6 +222,7 @@ def _lower_reduce(builder, op: TOp, ssa: Dict[int, object]):
         "arith.addf": builder.create_fadd,
         "arith.mulf": builder.create_fmul,
         "arith.muli": builder.create_mul,
+        "arith.maxnumf": builder.create_maxnumf,
     }
     try:
         combined = creators[combiner[0].name](lhs, rhs)
