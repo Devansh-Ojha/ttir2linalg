@@ -110,6 +110,21 @@ returned by Triton's compiler as `compiled.asm["ttir"]`, parsed with the
 existing Triton bindings, and verified before HGIR conversion. The kernels
 are compiler artifacts only; they are never launched.
 
+Inductor-generated Triton source is a separate stage and does not run Triton’s
+compiler:
+
+```bash
+PYTHONPATH=. python mlp_pipeline.py \
+  --compile-mlp-triton-source \
+  --triton-dir mlp-triton
+```
+
+This uses PyTorch Inductor’s compiler-only `get_code` hook and writes the
+actual Triton kernel bodies emitted by Inductor. It never reconstructs source
+from the FX graph. The command requires an environment where Inductor can
+select its CUDA/Triton backend; on CPU-only machines it fails explicitly
+instead of writing substitute kernels.
+
 The direct capture entry point is also runnable by itself:
 
 ```bash

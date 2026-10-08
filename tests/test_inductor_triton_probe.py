@@ -47,3 +47,18 @@ def test_mlp_triton_capture_requires_or_uses_triton(tmp_path):
             text = path.read_text()
             assert "tt.return" in text
             assert "tt.store" in text
+
+
+def test_mlp_triton_source_capture_requires_cuda_or_writes_sources(tmp_path):
+    from compiler.triton_capture import write_mlp_triton_source
+
+    try:
+        files = write_mlp_triton_source(tmp_path)
+    except RuntimeError as exc:
+        assert "Inductor Triton source capture" in str(exc)
+    else:
+        assert files
+        for path in files:
+            source = path.read_text()
+            assert "@triton.jit" in source
+            assert "def triton_" in source

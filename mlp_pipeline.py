@@ -79,6 +79,17 @@ def main():
         action="store_true",
         help="compile FC1+ReLU and FC2 to separate Triton TTIR files",
     )
+    parser.add_argument(
+        "--compile-mlp-triton-source",
+        action="store_true",
+        help="capture Triton source emitted by PyTorch Inductor",
+    )
+    parser.add_argument(
+        "--triton-dir",
+        type=Path,
+        default=None,
+        help="directory for Inductor-generated Triton source files",
+    )
     parser.add_argument("--ttir-out", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
@@ -88,6 +99,22 @@ def main():
     model = SimpleMLP(args.input_size, args.hidden_size, args.output_size).to(device)
     sample = torch.randn(1, args.input_size, device=device)
     graph, compiled, numerical_match, status, compile_mode = capture(model, sample)
+    if args.compile_mlp_triton_source:
+        from compiler.triton_capture import write_mlp_triton_source
+
+        source_dir = args.triton_dir or Path("mlp-triton")
+        files = write_mlp_triton_source(
+            source_dir,
+            input_size=args.input_size,
+            hidden_size=args.hidden_size,
+            output_size=args.output_size,
+        )
+        print(json.dumps({
+            "triton_source_dir": str(source_dir),
+            "triton_source_count": len(files),
+            "triton_source_files": [str(path) for path in files],
+        }, indent=2))
+        return
     ttir_paths = list(args.ttir)
     if args.compile_triton:
         from compiler.triton_capture import write_verified_ttir

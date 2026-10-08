@@ -6,6 +6,61 @@ it does not allocate device tensors or execute a kernel.
 """
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
+
+def _triton_sources_from_inductor_code(source_codes):
+    sources = []
+    for code in source_codes:
+        for match in re.finditer(r"'''(.*?)'''", code, re.DOTALL):
+            source = match.group(1)
+            if "@triton.jit" in source or "triton_" in source:
+                sources.append(source.strip() + "\n")
+    if not sources:
+        raise RuntimeError(
+            "Inductor generated code, but no Triton kernel source was found; "
+            "the selected backend may not be Triton"
+        )
+    return sources
+
+
+def capture_mlp_triton_source(input_size=4, hidden_size=8, output_size=8):
+    """Return Triton source emitted by Inductor without compiling or launching."""
+    try:
+        from torch._inductor.utils import get_code
+    except ImportError as exc:
+        raise RuntimeError("this PyTorch build has no Inductor source hook") from exc
+
+    import torch
+    from model.mlp import SimpleMLP
+
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "Inductor Triton source capture requires a CUDA/Triton backend; "
+            "no CUDA device is available"
+        )
+    model = SimpleMLP(input_size, hidden_size, output_size).eval().cuda()
+    sample = torch.randn(1, input_size, device="cuda")
+    compiled = torch.compile(model, backend="inductor")
+    source_codes = get_code(compiled, sample)
+    return _triton_sources_from_inductor_code(source_codes)
+
+
+def write_mlp_triton_source(path, input_size=4, hidden_size=8, output_size=8):
+    """Write one file per Triton kernel emitted by Inductor."""
+    output_dir = Path(path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    sources = capture_mlp_triton_source(input_size, hidden_size, output_size)
+    files = []
+    for index, source in enumerate(sources):
+        match = re.search(r"def\s+(triton_[A-Za-z0-9_]+)", source)
+        name = match.group(1) if match else "kernel_%d" % index
+        target = output_dir / ("kernel_%d_%s.py" % (index, name))
+        target.write_text(source)
+        files.append(target)
+    return files
+
 
 def _compile_kernel(kernel, input_size: int, output_size: int) -> str:
     try:
