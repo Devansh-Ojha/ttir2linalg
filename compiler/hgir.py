@@ -23,6 +23,7 @@ class HOp:
     inputs: list[str]
     outputs: list[str]
     attrs: dict[str, Any] = field(default_factory=dict)
+    regions: list[list["HOp"]] = field(default_factory=list)
 
 
 @dataclass
@@ -70,6 +71,17 @@ class HGraph:
                 "  %s = %s(%s)%s" %
                 (", ".join(op.outputs), op.name, ", ".join(op.inputs), attrs)
             )
+            for region in op.regions:
+                lines.append("    region {")
+                for nested in region:
+                    lines.append(
+                        "      %s = %s(%s)" % (
+                            ", ".join(nested.outputs),
+                            nested.name,
+                            ", ".join(nested.inputs),
+                        )
+                    )
+                lines.append("    }")
         lines.append("  return %s" % ", ".join(self.outputs))
         lines.append("}")
         return "\n".join(lines) + "\n"

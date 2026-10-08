@@ -3,10 +3,10 @@
 CPU/local path:
     PYTHONPATH=. python mlp_pipeline.py
 
-On CUDA with Triton installed, ``torch.compile`` is also exercised.  Inductor's
-generated Triton source/cache is implementation detail, so the stable graph
-input to this project is the exported FX graph.  A TTIR file can be inspected
-separately with ``--ttir`` using the existing parser.
+The script uses a compiler callback with ``torch.compile`` on every device.
+This captures the generated FX graph and checks its numerical result without
+requiring CUDA, an NVIDIA driver, or Triton execution.  A TTIR file can be
+inspected separately with ``--ttir`` using the existing parser.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import torch
 
-from compiler.hgir_from_fx import from_exported_graph
+from compiler.hgir_from_fx import from_exported_graph, from_fx_graph
 from model.mlp import SimpleMLP
 
 
@@ -24,23 +24,31 @@ def capture(model, sample):
     exported = torch.export.export(model, (sample,))
     graph = from_exported_graph(exported)
     compiled = False
+    compile_mode = "torch.export"
     numerical_match = None
-    compile_status = "not attempted: CUDA/Triton unavailable"
-    if sample.is_cuda:
-        try:
-            reference = model(sample)
-            compiled_model = torch.compile(model, backend="inductor")
-            actual = compiled_model(sample)
-            torch.testing.assert_close(actual, reference)
-            compiled = True
-            numerical_match = True
-            compile_status = "torch.compile backend=inductor succeeded"
-        except Exception as exc:
-            numerical_match = False
-            compile_status = "torch.compile failed: %s: %s" % (
-                type(exc).__name__, exc
-            )
-    return graph, compiled, numerical_match, compile_status
+    compile_status = "torch.compile not attempted"
+    captured = []
+
+    def capture_backend(graph_module, example_inputs):
+        captured.append(graph_module)
+        return graph_module
+
+    try:
+        compiled_model = torch.compile(model, backend=capture_backend)
+        actual = compiled_model(sample)
+        reference = model(sample)
+        torch.testing.assert_close(actual, reference)
+        compiled = True
+        compile_mode = "torch.compile graph capture"
+        numerical_match = True
+        compile_status = "captured FX graph without a device backend"
+        if captured:
+            graph = from_fx_graph(captured[0].graph)
+    except Exception as exc:
+        compile_status = "torch.compile capture failed: %s: %s" % (
+            type(exc).__name__, exc
+        )
+    return graph, compiled, numerical_match, compile_status, compile_mode
 
 
 def main():
@@ -49,6 +57,12 @@ def main():
     parser.add_argument("--hidden-size", type=int, default=8)
     parser.add_argument("--output-size", type=int, default=8)
     parser.add_argument("--ttir", type=Path, default=None)
+    parser.add_argument(
+        "--compile-triton",
+        action="store_true",
+        help="compile the representative Triton linear kernel to TTIR",
+    )
+    parser.add_argument("--ttir-out", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
 
@@ -56,20 +70,29 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = SimpleMLP(args.input_size, args.hidden_size, args.output_size).to(device)
     sample = torch.randn(1, args.input_size, device=device)
-    graph, compiled, numerical_match, status = capture(model, sample)
-    if args.ttir:
+    graph, compiled, numerical_match, status, compile_mode = capture(model, sample)
+    ttir_path = args.ttir
+    if args.compile_triton:
+        from compiler.triton_capture import compile_linear_ttir
+
+        ttir_text = compile_linear_ttir(args.input_size, args.hidden_size)
+        ttir_path = args.ttir_out or Path("mlp_linear.ttir")
+        ttir_path.write_text(ttir_text)
+        args.ttir = ttir_path
+    if ttir_path:
         from compiler.hgir_from_ttir import from_ttir_module
         from compiler.ttir_reader import parse_ttir
 
-        graph = from_ttir_module(parse_ttir(args.ttir.read_text()))
+        graph = from_ttir_module(parse_ttir(ttir_path.read_text()))
 
     report = {
         "torch": torch.__version__,
         "device": device,
         "torch_compile": compiled,
+        "compile_mode": compile_mode,
         "numerical_match": numerical_match,
         "compile_status": status,
-        "ttir_input": str(args.ttir) if args.ttir else None,
+        "ttir_input": str(ttir_path) if ttir_path else None,
     }
     print(json.dumps(report, indent=2))
     print(graph.format())

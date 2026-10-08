@@ -11,8 +11,7 @@ def _meta(node):
     return dtype, shape
 
 
-def from_exported_graph(exported) -> HGraph:
-    graph = exported.graph
+def from_fx_graph(graph) -> HGraph:
     inputs: dict[str, HValue] = {}
     values: dict[str, HValue] = {}
     ops: list[HOp] = []
@@ -56,3 +55,7 @@ def from_exported_graph(exported) -> HGraph:
     if errors:
         raise RuntimeError("invalid hardware-agnostic graph: " + "; ".join(errors))
     return graph_ir
+
+
+def from_exported_graph(exported) -> HGraph:
+    return from_fx_graph(exported.graph)

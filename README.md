@@ -25,20 +25,39 @@ its FX dataflow into the project-owned hardware-agnostic IR in
 and target-independent operations such as `linear` and `relu`; it does not
 encode Triton layouts, warps, or address spaces.
 
-On a CUDA machine with Triton, the same command also exercises
-`torch.compile(..., backend="inductor")` and checks its result against eager
-PyTorch. A TTIR artifact from the target environment can be converted through
-the existing TTIR parser with `--ttir`:
+The same command uses a `torch.compile` callback to capture the generated FX
+graph and checks its result against eager PyTorch without requiring CUDA, an
+NVIDIA driver, or Triton execution. A TTIR artifact from the target
+environment can be converted through the existing TTIR parser with `--ttir`:
 
 ```bash
 PYTHONPATH=. python mlp_pipeline.py --out mlp.hgir
 PYTHONPATH=. python mlp_pipeline.py --ttir path/to/kernel.ttir --out kernel.hgir
 ```
 
+In a Triton environment, a representative linear kernel can be compiled to
+TTIR without launching it:
+
+```bash
+PYTHONPATH=. python mlp_pipeline.py \
+  --compile-triton \
+  --ttir-out mlp_linear.ttir \
+  --out mlp_linear.hgir
+```
+
+The `cuda` target passed to Triton is confined to this optional artifact
+capture boundary. The resulting HGIR uses neutral names such as `buffer`,
+`range`, `load`, `reduce`, and `partition_id`; it does not retain Triton
+pointer types or CUDA layout details.
+
 The exported FX graph is the stable front-end contract. Inductor's generated
 Triton source and TTIR files are compiler-cache/debug artifacts and are
 therefore accepted as an optional input rather than assumed to have a stable
-Python hook.
+Python hook. In the current local environment, CPU Inductor is available but
+the Triton Python package is not installed; no CPU Triton backend is exposed.
+Triton TTIR therefore requires either a target environment with Triton or a
+previously captured `.ttir` artifact, while the FX-to-HGIR path remains fully
+CPU-only.
 
 `compiler/lower.py` and `compiler/linalg_lowering.py` remain the textual and
 structured reference paths. `lower_real.py` now also exercises the first real

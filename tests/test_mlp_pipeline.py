@@ -14,4 +14,6 @@ def test_mlp_pipeline():
     assert "linear(" in out
     assert "relu(" in out
     assert "return" in out
-    assert '"torch_compile": false' in out or '"torch_compile": true' in out
+    assert '"torch_compile": true' in out
+    assert '"compile_mode": "torch.compile graph capture"' in out
+    assert '"numerical_match": true' in out
