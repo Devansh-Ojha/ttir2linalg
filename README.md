@@ -17,6 +17,29 @@ The current pipeline successfully:
 - Writes the resulting representation to `linalg.mlir`
 - Includes a basic correctness test for the Triton linear kernel
 
+## Hardware-agnostic MLP pipeline
+
+`mlp_pipeline.py` captures a small PyTorch MLP with `torch.export` and converts
+its FX dataflow into the project-owned hardware-agnostic IR in
+`compiler/hgir.py`. The IR contains typed values, tensor shapes, dependencies,
+and target-independent operations such as `linear` and `relu`; it does not
+encode Triton layouts, warps, or address spaces.
+
+On a CUDA machine with Triton, the same command also exercises
+`torch.compile(..., backend="inductor")` and checks its result against eager
+PyTorch. A TTIR artifact from the target environment can be converted through
+the existing TTIR parser with `--ttir`:
+
+```bash
+PYTHONPATH=. python mlp_pipeline.py --out mlp.hgir
+PYTHONPATH=. python mlp_pipeline.py --ttir path/to/kernel.ttir --out kernel.hgir
+```
+
+The exported FX graph is the stable front-end contract. Inductor's generated
+Triton source and TTIR files are compiler-cache/debug artifacts and are
+therefore accepted as an optional input rather than assumed to have a stable
+Python hook.
+
 `compiler/lower.py` and `compiler/linalg_lowering.py` remain the textual and
 structured reference paths. `lower_real.py` now also exercises the first real
 MLIR milestone through Triton 3.4.0's `libtriton.ir` bindings: it parses TTIR,
