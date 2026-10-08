@@ -72,7 +72,7 @@ def main():
     parser.add_argument(
         "--compile-triton",
         action="store_true",
-        help="compile the representative Triton linear kernel to TTIR",
+        help="compile a representative Triton linear+ReLU kernel to TTIR",
     )
     parser.add_argument("--ttir-out", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
@@ -85,11 +85,14 @@ def main():
     graph, compiled, numerical_match, status, compile_mode = capture(model, sample)
     ttir_paths = list(args.ttir)
     if args.compile_triton:
-        from compiler.triton_capture import compile_linear_ttir
+        from compiler.triton_capture import write_verified_ttir
 
-        ttir_text = compile_linear_ttir(args.input_size, args.hidden_size)
         ttir_path = args.ttir_out or Path("mlp_linear.ttir")
-        ttir_path.write_text(ttir_text)
+        write_verified_ttir(
+            ttir_path,
+            input_size=args.input_size,
+            output_size=args.hidden_size,
+        )
         ttir_paths.append(ttir_path)
     if args.ttir_dir:
         ttir_paths.extend(sorted(args.ttir_dir.glob("*.ttir")))

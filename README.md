@@ -96,6 +96,19 @@ That command compiles the representative Triton kernel to genuine TTIR
 without launching it. CPU `torch.compile` itself cannot lower to TTIR when
 Inductor selects its `cpp` backend.
 
+The direct capture entry point is also runnable by itself:
+
+```bash
+PYTHONPATH=. python -m compiler.triton_capture \
+  --out mlp_linear_relu.ttir
+```
+
+It compiles a real fused linear+ReLU Triton kernel with
+`ASTSource`/`GPUTarget`, writes `compiled.asm["ttir"]`, parses the text through
+the existing `libtriton.ir` reader, and verifies the parsed module. No device
+tensors are allocated and no kernel is launched. If Triton is absent, the
+command fails explicitly rather than producing substitute TTIR.
+
 `compiler/lower.py` and `compiler/linalg_lowering.py` remain the textual and
 structured reference paths. `lower_real.py` now also exercises the first real
 MLIR milestone through Triton 3.4.0's `libtriton.ir` bindings: it parses TTIR,

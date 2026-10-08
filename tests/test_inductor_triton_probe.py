@@ -17,3 +17,15 @@ def test_inductor_triton_probe_does_not_fabricate_ttir():
     assert report["ttir_obtained"] is False
     assert "linear" in report["hgir"]
     assert "relu" in report["hgir"]
+
+
+def test_direct_triton_capture_requires_or_uses_triton():
+    from compiler.triton_capture import compile_linear_relu_ttir
+
+    try:
+        text = compile_linear_relu_ttir()
+    except RuntimeError as exc:
+        assert "Triton" in str(exc)
+    else:
+        assert "tt.return" in text
+        assert "tt.store" in text
