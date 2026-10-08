@@ -45,6 +45,16 @@ def _compile_kernel(kernel, input_size: int, output_size: int) -> str:
         ) from exc
 
 
+def _compile_kernel_family(kernels):
+    artifacts = []
+    for name, kernel, input_size, output_size in kernels:
+        artifacts.append((
+            name,
+            _compile_kernel(kernel, input_size, output_size),
+        ))
+    return artifacts
+
+
 def compile_linear_ttir(input_size: int = 4, output_size: int = 8) -> str:
     """Compile the existing linear kernel and return genuine TTIR text."""
     from kernels.mlp_kernel import linear_kernel
@@ -52,33 +62,57 @@ def compile_linear_ttir(input_size: int = 4, output_size: int = 8) -> str:
     return _compile_kernel(linear_kernel, input_size, output_size)
 
 
-def compile_linear_relu_ttir(input_size: int = 4, output_size: int = 8) -> str:
-    """Compile a fused linear+ReLU kernel without launching it."""
+def compile_mlp_ttir(input_size: int = 4, hidden_size: int = 8,
+                     output_size: int = 8):
+    """Compile the two MLP stages into genuine TTIR artifacts.
+
+    The first kernel computes FC1 followed by ReLU; the second computes FC2.
+    Compilation only produces compiler artifacts and never launches either
+    kernel.
+    """
     try:
-        import triton
-        import triton.language as tl
+        from kernels.mlp_ttir_kernels import linear_kernel, linear_relu_kernel
+    except ImportError as exc:
+        raise RuntimeError(
+            "Triton 3.4.0 is required for direct MLP TTIR capture"
+        ) from exc
+
+    return _compile_kernel_family(
+        [
+            ("fc1_relu", linear_relu_kernel, input_size, hidden_size),
+            ("fc2", linear_kernel, hidden_size, output_size),
+        ]
+    )
+
+
+def write_mlp_ttir(path, input_size=4, hidden_size=8, output_size=8):
+    """Write and libtriton-verify one TTIR file for each MLP stage."""
+    from pathlib import Path
+
+    output_dir = Path(path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    files = []
+    artifacts = compile_mlp_ttir(input_size, hidden_size, output_size)
+    from compiler.ttir_reader import parse_ttir
+
+    for index, (name, text) in enumerate(artifacts):
+        parsed = parse_ttir(text)
+        if not parsed.mod.verify():
+            raise RuntimeError("libtriton.ir rejected TTIR for %s" % name)
+        artifact = output_dir / ("kernel_%d_%s.ttir" % (index, name))
+        artifact.write_text(text)
+        files.append(artifact)
+    return files
+
+
+def compile_linear_relu_ttir(input_size: int = 4, output_size: int = 8) -> str:
+    """Compile the fused FC1+ReLU kernel without launching it."""
+    try:
+        from kernels.mlp_ttir_kernels import linear_relu_kernel
     except ImportError as exc:
         raise RuntimeError(
             "Triton 3.4.0 is required for direct TTIR capture"
         ) from exc
-
-    @triton.jit
-    def linear_relu_kernel(
-        x_ptr,
-        weight_ptr,
-        bias_ptr,
-        output_ptr,
-        INPUT_SIZE: tl.constexpr,
-        OUTPUT_SIZE: tl.constexpr,
-    ):
-        pid = tl.program_id(0)
-        offsets = tl.arange(0, INPUT_SIZE)
-        x = tl.load(x_ptr + offsets)
-        weight = tl.load(weight_ptr + pid * INPUT_SIZE + offsets)
-        bias = tl.load(bias_ptr + pid)
-        value = tl.sum(x * weight) + bias
-        value = tl.maximum(value, 0.0)
-        tl.store(output_ptr + pid, value)
 
     return _compile_kernel(linear_relu_kernel, input_size, output_size)
 
@@ -112,8 +146,18 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="mlp_linear_relu.ttir")
+    parser.add_argument("--mlp-dir", default=None)
     parser.add_argument("--input-size", type=int, default=4)
     parser.add_argument("--output-size", type=int, default=8)
     args = parser.parse_args()
-    text = write_verified_ttir(args.out, args.input_size, args.output_size)
-    print("wrote verified TTIR: %s (%d bytes)" % (args.out, len(text)))
+    if args.mlp_dir:
+        files = write_mlp_ttir(
+            args.mlp_dir,
+            input_size=args.input_size,
+            hidden_size=args.output_size,
+            output_size=args.output_size,
+        )
+        print("wrote verified TTIR files: %s" % ", ".join(map(str, files)))
+    else:
+        text = write_verified_ttir(args.out, args.input_size, args.output_size)
+        print("wrote verified TTIR: %s (%d bytes)" % (args.out, len(text)))

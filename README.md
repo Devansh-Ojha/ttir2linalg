@@ -96,6 +96,20 @@ That command compiles the representative Triton kernel to genuine TTIR
 without launching it. CPU `torch.compile` itself cannot lower to TTIR when
 Inductor selects its `cpp` backend.
 
+To capture the complete two-stage MLP representation as genuine TTIR:
+
+```bash
+PYTHONPATH=. python mlp_pipeline.py \
+  --compile-mlp-triton \
+  --ttir-dir mlp-ttir \
+  --out mlp.hgir
+```
+
+This writes `kernel_0_fc1_relu.ttir` and `kernel_1_fc2.ttir`. Each file is
+returned by Triton's compiler as `compiled.asm["ttir"]`, parsed with the
+existing Triton bindings, and verified before HGIR conversion. The kernels
+are compiler artifacts only; they are never launched.
+
 The direct capture entry point is also runnable by itself:
 
 ```bash

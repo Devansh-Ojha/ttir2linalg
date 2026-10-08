@@ -74,6 +74,11 @@ def main():
         action="store_true",
         help="compile a representative Triton linear+ReLU kernel to TTIR",
     )
+    parser.add_argument(
+        "--compile-mlp-triton",
+        action="store_true",
+        help="compile FC1+ReLU and FC2 to separate Triton TTIR files",
+    )
     parser.add_argument("--ttir-out", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
@@ -94,7 +99,19 @@ def main():
             output_size=args.hidden_size,
         )
         ttir_paths.append(ttir_path)
-    if args.ttir_dir:
+    compiled_mlp = False
+    if args.compile_mlp_triton:
+        from compiler.triton_capture import write_mlp_ttir
+
+        ttir_dir = args.ttir_dir or Path("mlp-ttir")
+        ttir_paths.extend(write_mlp_ttir(
+            ttir_dir,
+            input_size=args.input_size,
+            hidden_size=args.hidden_size,
+            output_size=args.output_size,
+        ))
+        compiled_mlp = True
+    if args.ttir_dir and not compiled_mlp:
         ttir_paths.extend(sorted(args.ttir_dir.glob("*.ttir")))
 
     graphs = None

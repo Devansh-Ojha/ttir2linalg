@@ -29,3 +29,21 @@ def test_direct_triton_capture_requires_or_uses_triton():
     else:
         assert "tt.return" in text
         assert "tt.store" in text
+
+
+def test_mlp_triton_capture_requires_or_uses_triton(tmp_path):
+    from compiler.triton_capture import write_mlp_ttir
+
+    try:
+        files = write_mlp_ttir(tmp_path)
+    except RuntimeError as exc:
+        assert "Triton" in str(exc)
+    else:
+        assert [path.name for path in files] == [
+            "kernel_0_fc1_relu.ttir",
+            "kernel_1_fc2.ttir",
+        ]
+        for path in files:
+            text = path.read_text()
+            assert "tt.return" in text
+            assert "tt.store" in text
