@@ -37,16 +37,35 @@ class HGraph:
     def verify(self) -> list[str]:
         errors: list[str] = []
         defined = set(self.inputs)
+        def verify_ops(ops, scope):
+            local_errors = []
+            local_defined = set(scope)
+            for op in ops:
+                missing = [name for name in op.inputs if name not in local_defined]
+                if missing:
+                    local_errors.append(
+                        "%s uses undefined values %s" % (op.name, missing)
+                    )
+                for name in op.outputs:
+                    if name in local_defined:
+                        local_errors.append("value %s is defined twice" % name)
+                    if name not in self.values:
+                        local_errors.append("missing type for value %s" % name)
+                    local_defined.add(name)
+                for region in op.regions:
+                    region_args = op.attrs.get("region_args", [])
+                    region_scope = local_defined | {
+                        name
+                        for names in region_args
+                        for name in names
+                    }
+                    local_errors.extend(verify_ops(region, region_scope))
+            return local_errors
+
+        errors.extend(verify_ops(self.ops, defined))
         for op in self.ops:
             missing = [name for name in op.inputs if name not in defined]
-            if missing:
-                errors.append("%s uses undefined values %s" % (op.name, missing))
-            for name in op.outputs:
-                if name in defined:
-                    errors.append("value %s is defined twice" % name)
-                if name not in self.values:
-                    errors.append("missing type for value %s" % name)
-                defined.add(name)
+            defined.update(op.outputs)
         errors.extend(
             "graph output %s is undefined" % name
             for name in self.outputs
@@ -71,8 +90,12 @@ class HGraph:
                 "  %s = %s(%s)%s" %
                 (", ".join(op.outputs), op.name, ", ".join(op.inputs), attrs)
             )
-            for region in op.regions:
-                lines.append("    region {")
+            for index, region in enumerate(op.regions):
+                region_args = op.attrs.get("region_args", [])
+                args = region_args[index] if index < len(region_args) else []
+                lines.append("    region%s {" % (
+                    ("(" + ", ".join(args) + ")") if args else ""
+                ))
                 for nested in region:
                     lines.append(
                         "      %s = %s(%s)" % (

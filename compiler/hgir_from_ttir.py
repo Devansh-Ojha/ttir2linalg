@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from compiler.hgir import HGraph, HOp, HValue
 from compiler.ttir_reader import TTIRModule
+from pathlib import Path
 
 
 _OP_NAMES = {
@@ -10,6 +11,10 @@ _OP_NAMES = {
     "arith.muli": "integer_multiply",
     "arith.mulf": "multiply",
     "arith.addf": "add",
+    "arith.maximumf": "maximum",
+    "arith.maxf": "maximum",
+    "arith.cmpf": "compare",
+    "arith.select": "select",
     "tt.get_program_id": "partition_id",
     "tt.make_range": "range",
     "tt.splat": "broadcast",
@@ -69,6 +74,17 @@ def from_ttir_module(tmod: TTIRModule) -> HGraph:
         attrs = dict(op.attrs)
         if op.regions:
             attrs["region_count"] = len(op.regions)
+            attrs["region_args"] = [
+                [arg.name for arg in block.args]
+                for region in op.regions
+                for block in region
+            ]
+            for region in op.regions:
+                for block in region:
+                    for arg in block.args:
+                        values[arg.name] = HValue(
+                            arg.name, _type_name(arg), arg.type.shape
+                        )
         return HOp(
             _OP_NAMES.get(op.name, "target_operation"),
             [operand.name for operand in op.operands],
@@ -84,8 +100,31 @@ def from_ttir_module(tmod: TTIRModule) -> HGraph:
         converted = convert_op(op)
         if converted is not None:
             ops.append(converted)
-    graph = HGraph(function.name, inputs, values, ops, outputs)
+    graph = HGraph(_kernel_name(function.name, ops), inputs, values, ops, outputs)
     errors = graph.verify()
     if errors:
         raise RuntimeError("invalid TTIR-derived HIR: " + "; ".join(errors))
     return graph
+
+
+def _kernel_name(name: str, ops: list[HOp]) -> str:
+    """Use neutral names while retaining a useful kernel classification."""
+    if any(op.name == "reduce" for op in ops):
+        return name + ".linear"
+    if any(op.name in {"maximum", "select", "compare", "relu"} for op in ops):
+        return name + ".relu"
+    return name
+
+
+def from_ttir_files(paths: list[Path]) -> list[HGraph]:
+    """Convert every captured kernel artifact, preserving file order."""
+    if not paths:
+        raise ValueError("no TTIR artifacts were supplied")
+    from compiler.ttir_reader import parse_ttir
+
+    graphs = []
+    for path in paths:
+        graph = from_ttir_module(parse_ttir(path.read_text()))
+        graph.name = "%s [%s]" % (graph.name, path.name)
+        graphs.append(graph)
+    return graphs

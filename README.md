@@ -35,6 +35,22 @@ PYTHONPATH=. python mlp_pipeline.py --out mlp.hgir
 PYTHONPATH=. python mlp_pipeline.py --ttir path/to/kernel.ttir --out kernel.hgir
 ```
 
+For a compiled MLP with multiple Triton kernels, pass every captured artifact
+or a directory. HGIR is generated from these TTIR modules, not from the FX
+graph:
+
+```bash
+PYTHONPATH=. python mlp_pipeline.py \
+  --ttir-dir path/to/mlp-ttir \
+  --out mlp.hgir
+```
+
+The output contains one verified HGIR graph per kernel, preserving kernel
+ordering, SSA dependencies, memory operations, shapes/types, and nested
+reduction regions. Linear kernels are classified from their reduction
+structure; elementwise kernels remain neutral operation graphs and can be
+identified from their captured kernel names/operations.
+
 In a Triton environment, a representative linear kernel can be compiled to
 TTIR without launching it:
 

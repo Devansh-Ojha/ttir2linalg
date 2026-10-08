@@ -56,7 +56,19 @@ def main():
     parser.add_argument("--input-size", type=int, default=4)
     parser.add_argument("--hidden-size", type=int, default=8)
     parser.add_argument("--output-size", type=int, default=8)
-    parser.add_argument("--ttir", type=Path, default=None)
+    parser.add_argument(
+        "--ttir",
+        type=Path,
+        action="append",
+        default=[],
+        help="captured TTIR kernel; repeat for every generated kernel",
+    )
+    parser.add_argument(
+        "--ttir-dir",
+        type=Path,
+        default=None,
+        help="directory containing captured *.ttir kernels",
+    )
     parser.add_argument(
         "--compile-triton",
         action="store_true",
@@ -71,19 +83,22 @@ def main():
     model = SimpleMLP(args.input_size, args.hidden_size, args.output_size).to(device)
     sample = torch.randn(1, args.input_size, device=device)
     graph, compiled, numerical_match, status, compile_mode = capture(model, sample)
-    ttir_path = args.ttir
+    ttir_paths = list(args.ttir)
     if args.compile_triton:
         from compiler.triton_capture import compile_linear_ttir
 
         ttir_text = compile_linear_ttir(args.input_size, args.hidden_size)
         ttir_path = args.ttir_out or Path("mlp_linear.ttir")
         ttir_path.write_text(ttir_text)
-        args.ttir = ttir_path
-    if ttir_path:
-        from compiler.hgir_from_ttir import from_ttir_module
-        from compiler.ttir_reader import parse_ttir
+        ttir_paths.append(ttir_path)
+    if args.ttir_dir:
+        ttir_paths.extend(sorted(args.ttir_dir.glob("*.ttir")))
 
-        graph = from_ttir_module(parse_ttir(ttir_path.read_text()))
+    graphs = None
+    if ttir_paths:
+        from compiler.hgir_from_ttir import from_ttir_files
+
+        graphs = from_ttir_files(ttir_paths)
 
     report = {
         "torch": torch.__version__,
@@ -92,12 +107,20 @@ def main():
         "compile_mode": compile_mode,
         "numerical_match": numerical_match,
         "compile_status": status,
-        "ttir_input": str(ttir_path) if ttir_path else None,
+        "ttir_input": [str(path) for path in ttir_paths] or None,
+        "ttir_kernel_count": len(graphs) if graphs else 0,
     }
     print(json.dumps(report, indent=2))
-    print(graph.format())
+    if graphs:
+        rendered = "\n".join(
+            "=== HGIR kernel %d/%d ===\n%s" % (index, len(graphs), item.format())
+            for index, item in enumerate(graphs, 1)
+        )
+    else:
+        rendered = graph.format()
+    print(rendered)
     if args.out:
-        args.out.write_text(graph.format())
+        args.out.write_text(rendered)
 
 
 if __name__ == "__main__":
