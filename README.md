@@ -75,6 +75,27 @@ Triton TTIR therefore requires either a target environment with Triton or a
 previously captured `.ttir` artifact, while the FX-to-HGIR path remains fully
 CPU-only.
 
+To inspect this boundary without changing the pipeline, run:
+
+```bash
+PYTHONPATH=. python -m compiler.inductor_triton_probe
+```
+
+The probe reports the exact representation obtained. On a CPU-only install it
+reports `representation: "fx_graph"` and `ttir_obtained: false`; this is a
+real `torch.compile` compiler-callback graph, not fabricated TTIR. The
+existing direct Triton compiler path remains available in environments where
+the Triton package is installed:
+
+```bash
+PYTHONPATH=. python mlp_pipeline.py --compile-triton \
+  --ttir-out mlp_linear.ttir --out mlp_linear.hgir
+```
+
+That command compiles the representative Triton kernel to genuine TTIR
+without launching it. CPU `torch.compile` itself cannot lower to TTIR when
+Inductor selects its `cpp` backend.
+
 `compiler/lower.py` and `compiler/linalg_lowering.py` remain the textual and
 structured reference paths. `lower_real.py` now also exercises the first real
 MLIR milestone through Triton 3.4.0's `libtriton.ir` bindings: it parses TTIR,
