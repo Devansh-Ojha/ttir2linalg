@@ -1,0 +1,46 @@
+==========================================================================
+   MLIR SECTION-BY-SECTION BREAKDOWN & TTIR/TTGIR DIVERGENCE BOUNDARY
+==========================================================================
+
+--- FILE: kernel_0_fc1_relu.ttir ---
+  Header:   tt.func public @linear_relu_kernel(%arg0: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":7:0), %arg1: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":7:0), %arg2: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":7:0), %arg3: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":7:0)) attributes {noinline = false} {
+  Hardware Agnostic: True (0 GPU layout attributes)
+  Operation Section Breakdown:
+    - arith.addf: 2 occurrences
+    - arith.constant: 2 occurrences
+    - arith.maxnumf: 1 occurrences
+    - arith.mulf: 1 occurrences
+    - arith.muli: 1 occurrences
+    - tt.addptr: 5 occurrences
+    - tt.get_program_id: 1 occurrences
+    - tt.load: 3 occurrences
+    - tt.reshape: 1 occurrences
+    - tt.splat: 2 occurrences
+
+  [INTERCEPTION POINT / DIVERGENCE BOUNDARY]:
+    -> Vendor NPU plugins (Huawei Ascend triton-ascend, Tenstorrent tt-mlir)
+       intercept HERE right after this TTIR MLIR stage.
+    -> STOP HERE before GPU-specific passes (TTGIR) add warps, CTAs,
+       shared memory, and blocked layout encodings.
+--------------------------------------------------------------------------
+
+--- FILE: kernel_1_fc2.ttir ---
+  Header:   tt.func public @linear_kernel(%arg0: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":26:0), %arg1: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":26:0), %arg2: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":26:0), %arg3: !tt.ptr<f32> loc("/home/aa/users/cs199-alh/ttir2linalg/kernels/mlp_ttir_kernels.py":26:0)) attributes {noinline = false} {
+  Hardware Agnostic: True (0 GPU layout attributes)
+  Operation Section Breakdown:
+    - arith.addf: 2 occurrences
+    - arith.constant: 1 occurrences
+    - arith.mulf: 1 occurrences
+    - arith.muli: 1 occurrences
+    - tt.addptr: 5 occurrences
+    - tt.get_program_id: 1 occurrences
+    - tt.load: 3 occurrences
+    - tt.reshape: 1 occurrences
+    - tt.splat: 2 occurrences
+
+  [INTERCEPTION POINT / DIVERGENCE BOUNDARY]:
+    -> Vendor NPU plugins (Huawei Ascend triton-ascend, Tenstorrent tt-mlir)
+       intercept HERE right after this TTIR MLIR stage.
+    -> STOP HERE before GPU-specific passes (TTGIR) add warps, CTAs,
+       shared memory, and blocked layout encodings.
+--------------------------------------------------------------------------
