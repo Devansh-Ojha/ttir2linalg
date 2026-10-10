@@ -51,6 +51,13 @@ def capture_model_triton_source(
         sample = torch.randn(
             1, sequence_length, embed_size, device="cuda"
         )
+    elif model_name == "attention_mlp":
+        from model.attention_mlp import AttentionMLP
+
+        model = AttentionMLP(embed_size, num_heads, hidden_size).eval().cuda()
+        sample = torch.randn(
+            1, sequence_length, embed_size, device="cuda"
+        )
     else:
         raise ValueError("unsupported model %r" % model_name)
 
@@ -60,12 +67,7 @@ def capture_model_triton_source(
 
 
 def _explicit_model_triton_sources(model_name):
-    """Return source from the project's explicit Triton lowering path.
-
-    This is intentionally not labeled as Inductor output. The kernel source is
-    authored as a target-independent model lowering and then can be compiled
-    by Triton to obtain genuine TTIR.
-    """
+    """Return source from the project's explicit Triton lowering path."""
     kernel_files = {
         "mlp": (
             Path(__file__).parent.parent / "kernels" / "mlp_ttir_kernels.py",
@@ -74,6 +76,10 @@ def _explicit_model_triton_sources(model_name):
         "attention": (
             Path(__file__).parent.parent / "kernels" / "attention_ttir_kernels.py",
             ("attention_kernel",),
+        ),
+        "attention_mlp": (
+            Path(__file__).parent.parent / "kernels" / "attention_mlp_ttir_kernels.py",
+            ("attention_kernel", "linear_relu_kernel", "linear_kernel"),
         ),
     }
     try:
@@ -269,6 +275,12 @@ def write_mlp_ttir(path, input_size=4, hidden_size=8, output_size=8):
     return files
 
 
+def compile_attention_mlp_ttir(sequence_length=4, embed_size=8, hidden_size=8):
+    attn_artifacts = compile_attention_ttir(sequence_length, embed_size)
+    mlp_artifacts = compile_mlp_ttir(embed_size, hidden_size, embed_size)
+    return attn_artifacts + mlp_artifacts
+
+
 def write_model_ttir(
     path, model_name="mlp", input_size=4, hidden_size=8, output_size=8,
     sequence_length=4, embed_size=8,
@@ -277,6 +289,8 @@ def write_model_ttir(
         artifacts = compile_mlp_ttir(input_size, hidden_size, output_size)
     elif model_name == "attention":
         artifacts = compile_attention_ttir(sequence_length, embed_size)
+    elif model_name == "attention_mlp":
+        artifacts = compile_attention_mlp_ttir(sequence_length, embed_size, hidden_size)
     else:
         raise ValueError("unsupported model %r" % model_name)
     output_dir = Path(path)

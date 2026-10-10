@@ -53,21 +53,30 @@ def create_model(args):
     import torch
     from model.attention import SimpleAttention
     from model.mlp import SimpleMLP
+    from model.attention_mlp import AttentionMLP
 
     if args.model == "mlp":
         return (
             SimpleMLP(args.input_size, args.hidden_size, args.output_size),
             torch.randn(1, args.input_size),
         )
-    return (
-        SimpleAttention(args.embed_size, args.num_heads),
-        torch.randn(1, args.sequence_length, args.embed_size),
-    )
+    elif args.model == "attention":
+        return (
+            SimpleAttention(args.embed_size, args.num_heads),
+            torch.randn(1, args.sequence_length, args.embed_size),
+        )
+    elif args.model == "attention_mlp":
+        return (
+            AttentionMLP(args.embed_size, args.num_heads, args.hidden_size),
+            torch.randn(1, args.sequence_length, args.embed_size),
+        )
+    else:
+        raise ValueError("unsupported model %r" % args.model)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=("mlp", "attention"), default="mlp")
+    parser.add_argument("--model", choices=("mlp", "attention", "attention_mlp"), default="mlp")
     parser.add_argument("--input-size", type=int, default=4)
     parser.add_argument("--hidden-size", type=int, default=8)
     parser.add_argument("--output-size", type=int, default=8)
@@ -123,14 +132,24 @@ def main():
         action="store_true",
         help="inspect TTIR MLIR passes section-by-section and show divergence boundary",
     )
+    parser.add_argument(
+        "--inspect-out",
+        type=Path,
+        default=None,
+        help="save pass inspection report directly to a file",
+    )
     parser.add_argument("--ttir-out", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
 
     if args.inspect_passes:
-        from compiler.pass_inspector import print_pass_boundary_breakdown
+        from compiler.pass_inspector import get_pass_boundary_report
         ttir_dir = args.ttir_dir or Path("mlp-ttir")
-        print_pass_boundary_breakdown(ttir_dir)
+        report_text = get_pass_boundary_report(ttir_dir)
+        print(report_text)
+        if args.inspect_out:
+            args.inspect_out.write_text(report_text)
+            print(f"Wrote pass inspection report to {args.inspect_out}")
         return
 
     import torch

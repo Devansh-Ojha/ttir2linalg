@@ -35,34 +35,41 @@ def inspect_ttir_file_sections(ttir_path: Path) -> dict[str, Any]:
     }
 
 
-def print_pass_boundary_breakdown(ttir_dir: Path):
-    """Print section-by-section MLIR pass breakdown for all .ttir files in a directory."""
-    files = list(ttir_dir.glob("*.ttir"))
+def get_pass_boundary_report(ttir_dir: Path) -> str:
+    """Return section-by-section MLIR pass breakdown report string for a directory of .ttir files."""
+    files = sorted(list(ttir_dir.glob("*.ttir")))
     if not files:
-        print(f"No .ttir files found in {ttir_dir}")
-        return
+        return f"No .ttir files found in {ttir_dir}"
 
-    print("==========================================================================")
-    print("   MLIR SECTION-BY-SECTION BREAKDOWN & TTIR/TTGIR DIVERGENCE BOUNDARY")
-    print("==========================================================================")
-    print()
+    lines = []
+    lines.append("==========================================================================")
+    lines.append("   MLIR SECTION-BY-SECTION BREAKDOWN & TTIR/TTGIR DIVERGENCE BOUNDARY")
+    lines.append("==========================================================================")
+    lines.append("")
 
     for file_path in files:
         info = inspect_ttir_file_sections(file_path)
-        print(f"--- FILE: {info['file_name']} ---")
-        print(f"  Header: {info['func_header']}")
-        print(f"  Hardware Agnostic: {info['is_hardware_agnostic']} (0 GPU layout attributes)")
-        print("  Operation Section Breakdown:")
+        lines.append(f"--- FILE: {info['file_name']} ---")
+        lines.append(f"  Header: {info['func_header']}")
+        lines.append(f"  Hardware Agnostic: {info['is_hardware_agnostic']} (0 GPU layout attributes)")
+        lines.append("  Operation Section Breakdown:")
         for op, count in sorted(info["operation_summary"].items()):
-            print(f"    - {op}: {count} occurrences")
-        print()
-        print("  [INTERCEPTION POINT / DIVERGENCE BOUNDARY]:")
-        print("    -> Vendor NPU plugins (Huawei Ascend triton-ascend, Tenstorrent tt-mlir)")
-        print("       intercept HERE right after this TTIR MLIR stage.")
-        print("    -> STOP HERE before GPU-specific passes (TTGIR) add warps, CTAs,")
-        print("       shared memory, and blocked layout encodings.")
-        print("--------------------------------------------------------------------------")
-        print()
+            lines.append(f"    - {op}: {count} occurrences")
+        lines.append("")
+        lines.append("  [INTERCEPTION POINT / DIVERGENCE BOUNDARY]:")
+        lines.append("    -> Vendor NPU plugins (Huawei Ascend triton-ascend, Tenstorrent tt-mlir)")
+        lines.append("       intercept HERE right after this TTIR MLIR stage.")
+        lines.append("    -> STOP HERE before GPU-specific passes (TTGIR) add warps, CTAs,")
+        lines.append("       shared memory, and blocked layout encodings.")
+        lines.append("--------------------------------------------------------------------------")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def print_pass_boundary_breakdown(ttir_dir: Path):
+    """Print section-by-section MLIR pass breakdown to console."""
+    print(get_pass_boundary_report(ttir_dir))
 
 
 if __name__ == "__main__":
