@@ -14,14 +14,11 @@ import argparse
 import json
 from pathlib import Path
 
-import torch
-
-from compiler.hgir_from_fx import from_exported_graph, from_fx_graph
-from model.attention import SimpleAttention
-from model.mlp import SimpleMLP
-
 
 def capture(model, sample):
+    import torch
+    from compiler.hgir_from_fx import from_exported_graph, from_fx_graph
+
     exported = torch.export.export(model, (sample,))
     graph = from_exported_graph(exported)
     compiled = False
@@ -53,6 +50,10 @@ def capture(model, sample):
 
 
 def create_model(args):
+    import torch
+    from model.attention import SimpleAttention
+    from model.mlp import SimpleMLP
+
     if args.model == "mlp":
         return (
             SimpleMLP(args.input_size, args.hidden_size, args.output_size),
@@ -117,10 +118,22 @@ def main():
         default=None,
         help="directory for Inductor-generated Triton source files",
     )
+    parser.add_argument(
+        "--inspect-passes",
+        action="store_true",
+        help="inspect TTIR MLIR passes section-by-section and show divergence boundary",
+    )
     parser.add_argument("--ttir-out", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
 
+    if args.inspect_passes:
+        from compiler.pass_inspector import print_pass_boundary_breakdown
+        ttir_dir = args.ttir_dir or Path("mlp-ttir")
+        print_pass_boundary_breakdown(ttir_dir)
+        return
+
+    import torch
     torch.manual_seed(0)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model, sample = create_model(args)
