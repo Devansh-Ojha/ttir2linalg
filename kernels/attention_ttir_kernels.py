@@ -20,7 +20,8 @@ def attention_kernel(
         k_ptr + keys[:, None] * EMBED_SIZE + dims[None, :]
     )
     scores = tl.sum(query[None, :] * key, axis=1)
-    scores = scores * (1.0 / tl.sqrt(EMBED_SIZE))
+    scale = 1.0 / (EMBED_SIZE ** 0.5)
+    scores = scores * scale
     weights = tl.softmax(scores)
     values = tl.load(
         v_ptr + keys[:, None] * EMBED_SIZE + dims[None, :]
