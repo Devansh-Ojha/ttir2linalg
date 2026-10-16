@@ -13,24 +13,12 @@ from __future__ import annotations
 import os
 import re
 import tempfile
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 from triton._C.libtriton import ir
+from compiler.ttir_model import TBlock, TFunc, TOp, TType, TValue
 
 _PTR_RE = re.compile(r"^!tt\.ptr<\s*([^,>]+?)\s*(?:,\s*\d+\s*)?>$")
-
-
-@dataclass(frozen=True)
-class TType:
-    kind: str                      # "scalar" | "ptr" | "tensor"
-    elem: str                      # element type (pointee type for ptr)
-    shape: Tuple[int, ...] = ()
-    elem_is_ptr: bool = False      # tensor of pointers
-    raw: str = ""
-
-    def __str__(self):
-        return self.raw
 
 
 def parse_type(s: str) -> TType:
@@ -48,42 +36,6 @@ def parse_type(s: str) -> TType:
             return TType("tensor", pm.group(1), dims, True, s)
         return TType("tensor", et, dims, False, s)
     return TType("scalar", s, (), False, s)
-
-
-@dataclass
-class TValue:
-    id: int
-    type: TType
-    name: str                       # best-effort original SSA name, e.g. "%12"
-    is_block_arg: bool = False
-    defining_op: Optional["TOp"] = None
-
-
-@dataclass
-class TBlock:
-    id: int
-    args: List[TValue] = field(default_factory=list)
-    ops: List["TOp"] = field(default_factory=list)
-
-
-@dataclass
-class TOp:
-    name: str
-    operands: List[TValue] = field(default_factory=list)
-    results: List[TValue] = field(default_factory=list)
-    attrs: Dict[str, str] = field(default_factory=dict)   # raw text, e.g. "4 : i32"
-    regions: List[List[TBlock]] = field(default_factory=list)
-    index: int = 0
-
-    def attr_int(self, key: str) -> int:
-        return int(self.attrs[key].split(":")[0].strip())
-
-
-@dataclass
-class TFunc:
-    name: str
-    args: List[TValue]
-    body: TBlock
 
 
 # ----------------------------------------------------------------- text scan
