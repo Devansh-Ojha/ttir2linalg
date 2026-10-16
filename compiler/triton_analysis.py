@@ -31,17 +31,21 @@ class MatmulRelu:
     rhs_load: Optional[TOp] = None
     store: Optional[TOp] = None
 
-
 def _is_zero(value: TValue, definitions: dict[int, TOp]) -> bool:
     defining_op = definitions.get(value.id)
     if defining_op is None or defining_op.name != "arith.constant":
         return False
+
     text = defining_op.attrs.get("value", "").strip()
+
+    # Handle splat tensor constants like dense<0.000000e+00>
+    if text.startswith("dense<") and text.endswith(">"):
+        text = text[6:-1].strip()
+
     try:
         return float(text.split(":", 1)[0].strip()) == 0.0
     except ValueError:
         return False
-
 
 def analyze_matmul_relu(function: TFunc) -> MatmulRelu:
     """Recognize exactly one direct matmul followed by max(matmul, 0).
