@@ -81,12 +81,33 @@ def _split_top(s: str) -> List[str]:
 def _scan_text(ttir: str):
     """Return [(opname, result_name_or_None, attrs_dict)] in textual order."""
     found = []
+    # The scanner is intentionally line-oriented. Do not claim an admitted
+    # leaf has no attributes when its spelling continues on another line.
+    # Region-bearing operations retain their existing scanning behavior.
+    leaves = {"tt.load", "tt.store", "tt.dot", "tt.fp_to_fp", "arith.constant",
+              "arith.truncf", "arith.maxnumf"}
+    previous = None
     for line in _strip_locs(ttir).splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
+            continue
         m = _LINE_RE.match(line)
         if not m:
+            if previous in leaves and not stripped.startswith(("}", "^", "#")):
+                raise RuntimeError(
+                    f"cannot reliably extract attributes from multiline {previous}; "
+                    "use a single-line operation")
+            previous = None
             continue
         res, qname, bname = m.group(1), m.group(2), m.group(3)
         name = qname or bname
+        previous = name
+        if name in leaves:
+            spelling = line.split("//", 1)[0]
+            if spelling.count("{") != spelling.count("}"):
+                raise RuntimeError(
+                    f"cannot reliably extract attributes from multiline {name}; "
+                    "use a single-line operation")
         attrs: Dict[str, str] = {}
         if name == "tt.get_program_id":
             pm = re.search(r"tt\.get_program_id\s+([xyz])", line)
@@ -104,6 +125,13 @@ def _scan_text(ttir: str):
                     if "=" in kv:
                         k, v = kv.split("=", 1)
                         attrs[k.strip()] = v.strip()
+        if name == "tt.fp_to_fp":
+            # Custom assembly prints this enum outside the attribute dictionary.
+            rounding = re.search(r",\s*rounding\s*=\s*([A-Za-z_][A-Za-z_0-9]*)", line.split("//", 1)[0])
+            if rounding:
+                if "rounding" in attrs:
+                    raise RuntimeError("duplicate tt.fp_to_fp rounding attribute")
+                attrs["rounding"] = rounding.group(1)
         found.append((name, res, attrs))
     return found
 

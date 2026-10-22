@@ -1,0 +1,23 @@
+// Source RHS tiles are [K,N]. Atlas translation requires the explicitly
+// selected atlas-fp8-mlp-v1 numerical policy; this is not FP32 equivalence.
+module {
+  tt.func public @two_layer_mlp(
+      %xp: tensor<32x32x!tt.ptr<f8E4M3FN>>,
+      %b0p: tensor<32x32x!tt.ptr<f8E4M3FN>>,
+      %b1p: tensor<32x32x!tt.ptr<f8E4M3FN>>,
+      %yp: tensor<32x32x!tt.ptr<bf16>>) {
+    %x = tt.load %xp : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %b0 = tt.load %b0p : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %b1 = tt.load %b1p : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %z = arith.constant dense<0.000000e+00> : tensor<32x32xf32>
+    %zb = arith.constant dense<0.000000e+00> : tensor<32x32xbf16>
+    %d0 = tt.dot %x, %b0, %z, inputPrecision = ieee : tensor<32x32xf8E4M3FN> * tensor<32x32xf8E4M3FN> -> tensor<32x32xf32>
+    %hbf = arith.truncf %d0 : tensor<32x32xf32> to tensor<32x32xbf16>
+    %relu = arith.maxnumf %hbf, %zb : tensor<32x32xbf16>
+    %h8 = tt.fp_to_fp %relu, rounding = rtne : tensor<32x32xbf16> -> tensor<32x32xf8E4M3FN>
+    %d1 = tt.dot %h8, %b1, %z, inputPrecision = ieee : tensor<32x32xf8E4M3FN> * tensor<32x32xf8E4M3FN> -> tensor<32x32xf32>
+    %y = arith.truncf %d1 : tensor<32x32xf32> to tensor<32x32xbf16>
+    tt.store %yp, %y : tensor<32x32x!tt.ptr<bf16>>
+    tt.return
+  }
+}
