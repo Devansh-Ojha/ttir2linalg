@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from compiler.ttir_model import TBlock, TFunc, TOp, TType, TValue
 from compiler.triton_analysis import analyze_matmul_relu
 from compiler.atlas_mapping import AtlasTileABI, map_matmul_relu
+from compiler.ttir_to_atlas import convert_function
 
 
 def value(identity: int, kind: str, shape: tuple[int, ...] = ()) -> TValue:
@@ -58,6 +60,25 @@ class TritonAnalysisTest(unittest.TestCase):
         self.assertIn('"atlas.virtual_vpu_unary"(%dot) {kind = "relu"}', mlir)
         self.assertIn('"atlas.virtual_output_bf16"(%io2, %relu)', mlir)
         self.assertNotIn("atlas.machine", mlir)
+        fixture = Path(__file__).parents[1] / "examples/ttir_to_atlas/matmul_relu.virtual.mlir"
+        self.assertEqual(map_matmul_relu(plan).strip(), "\n".join(
+            line for line in fixture.read_text().splitlines()
+            if not line.lstrip().startswith("//")
+        ).strip())
+
+    def test_conversion_driver_accepts_an_independent_target_mapper(self) -> None:
+        class RecordingMapper:
+            def __init__(self):
+                self.plan = None
+
+            def map_matmul_relu(self, plan):
+                self.plan = plan
+                return "other.target.matmul_relu"
+
+        function = self.function()
+        mapper = RecordingMapper()
+        self.assertEqual(convert_function(function, mapper), "other.target.matmul_relu")
+        self.assertIs(mapper.plan.matmul, function.body.ops[2])
 
 
 if __name__ == "__main__":

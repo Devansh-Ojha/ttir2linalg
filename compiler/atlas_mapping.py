@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+import struct
 
-from compiler.triton_analysis import MatmulRelu, TwoLayerMlp
+from compiler.triton_analysis import (LinearRelu, MatmulRelu,
+                                      ScaledDotProductAttention, TwoLayerMlp)
+from compiler.target_mapping import TritonWorkloadPlan
 
 
 @dataclass(frozen=True)
@@ -78,6 +82,8 @@ class AtlasMlpABI:
 
 
 MLP_NUMERICAL_POLICY = "atlas-fp8-mlp-v1"
+LINEAR_NUMERICAL_POLICY = "atlas-fp8-linear-v1"
+ATTENTION_NUMERICAL_POLICY = "atlas-fp8-attention-v1"
 
 
 def map_two_layer_mlp(plan: TwoLayerMlp, abi: AtlasMlpABI = AtlasMlpABI(), *, numerical_policy=None) -> str:
@@ -119,3 +125,154 @@ def map_two_layer_mlp(plan: TwoLayerMlp, abi: AtlasMlpABI = AtlasMlpABI(), *, nu
         f'    %io4 = "atlas.virtual_output_bf16"(%io3, %y) {{index = {abi.output_index} : i32}} : (!atlas.virtual_state, !atlas.virtual_bf16) -> !atlas.virtual_state',
         '    return %io4 : !atlas.virtual_state', '  }', '}', '']
     return "\n".join(lines)
+
+
+def _validate_tile_abi(slots: tuple[int, ...], input_base: int, output_base: int) -> None:
+    _require(bool(slots) and all(type(i) is int and 0 <= i < 64 for i in slots) and
+             len(set(slots)) == len(slots), "input slots must be distinct indexes below 64")
+    _require(all(type(a) is int and a >= 0x80000000 and a % 2048 == 0
+                 for a in (input_base, output_base)), "DRAM bases must be 2 KiB-aligned DRAM addresses")
+    input_end = input_base + (max(slots) + 1) * 2048
+    output_end = output_base + 2048
+    _require(input_end <= 1 << 32 and output_end <= 1 << 32 and
+             (input_end <= output_base or output_end <= input_base),
+             "input and output tile slots overlap or exceed 32-bit DRAM")
+
+
+@dataclass(frozen=True)
+class AtlasLinearReluABI:
+    """Tile slots for the per-output FC + bias + ReLU sample kernel."""
+
+    x_slot: int = 0
+    weight_slot: int = 1
+    bias_slot: int = 2
+    output_base: int = 0x90002000
+    input_base: int = 0x90000000
+    output_index: int = 0
+    output_features: int = 8
+
+
+def map_linear_relu(plan: LinearRelu, abi: AtlasLinearReluABI = AtlasLinearReluABI(), *, numerical_policy=None) -> str:
+    """Map one source vector projection into the first row of a padded tile.
+
+    The caller stages the activation and [K,N] weights as padded FP8 tiles,
+    and the bias as a BF16 tile whose first row contains the output bias. The
+    explicit precision policy records the source FP32 to Atlas FP8/BF16 change.
+    """
+    _require(numerical_policy == LINEAR_NUMERICAL_POLICY,
+             f"single-layer MLP requires numerical policy {LINEAR_NUMERICAL_POLICY}")
+    _require(0 < plan.input_features <= 32 and 0 < abi.output_features <= 32,
+             "single-layer MLP dimensions must fit one padded 32x32 tile")
+    _require(type(abi.output_index) is int and 0 <= abi.output_index < 64,
+             "invalid output index")
+    slots = (abi.x_slot, abi.weight_slot, abi.bias_slot)
+    _validate_tile_abi(slots, abi.input_base, abi.output_base)
+    return f'''module {{
+  func.func @ttir_{plan.function}_atlas() -> !atlas.virtual_state attributes {{atlas.input_dram_base = {abi.input_base} : i64, atlas.output_dram_base = {abi.output_base} : i64}} {{
+    %io0 = "atlas.virtual_start"() : () -> !atlas.virtual_state
+    %io1, %x = "atlas.virtual_input_fp8"(%io0) {{index = {abi.x_slot} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_fp8)
+    %io2, %weight = "atlas.virtual_input_fp8"(%io1) {{index = {abi.weight_slot} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_fp8)
+    %io3, %bias = "atlas.virtual_input_bf16"(%io2) {{index = {abi.bias_slot} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_bf16)
+    %weight_nk = "atlas.virtual_xlu_transpose"(%weight) : (!atlas.virtual_fp8) -> !atlas.virtual_fp8
+    %dot = "atlas.virtual_mxu_matmul"(%x, %weight_nk) {{unit = 0 : i32}} : (!atlas.virtual_fp8, !atlas.virtual_fp8) -> !atlas.virtual_bf16
+    %biased = "atlas.virtual_vpu_binary"(%dot, %bias) {{kind = "add"}} : (!atlas.virtual_bf16, !atlas.virtual_bf16) -> !atlas.virtual_bf16
+    %relu = "atlas.virtual_vpu_unary"(%biased) {{kind = "relu"}} : (!atlas.virtual_bf16) -> !atlas.virtual_bf16
+    %io4 = "atlas.virtual_output_bf16"(%io3, %relu) {{index = {abi.output_index} : i32}} : (!atlas.virtual_state, !atlas.virtual_bf16) -> !atlas.virtual_state
+    return %io4 : !atlas.virtual_state
+  }}
+}}
+'''
+
+
+@dataclass(frozen=True)
+class AtlasAttentionABI:
+    """FP8 Q/K/V and BF16 additive-mask tile slots for one attention query."""
+
+    input_slots: tuple[int, int, int, int] = (0, 1, 2, 3)
+    input_base: int = 0x90000000
+    output_base: int = 0x90004000
+    output_index: int = 0
+
+
+def _bf16_bits(value: float) -> int:
+    raw = struct.unpack("<I", struct.pack("<f", value))[0]
+    return ((raw + 0x7FFF + ((raw >> 16) & 1)) >> 16) & 0xFFFF
+
+
+def map_attention(plan: ScaledDotProductAttention, abi: AtlasAttentionABI = AtlasAttentionABI(), *, numerical_policy=None) -> str:
+    """Map one query's scaled dot-product attention over a padded 32x32 tile.
+
+    The BF16 mask input is 0 for valid keys and a sufficiently negative value
+    for padded keys; this prevents padding from changing the softmax. Q/K/V
+    tiles are staged in FP8. Softmax probabilities are packed to FP8 before
+    the second MXU operation, matching the existing Atlas attention example.
+    """
+    _require(numerical_policy == ATTENTION_NUMERICAL_POLICY,
+             f"attention requires numerical policy {ATTENTION_NUMERICAL_POLICY}")
+    _require(plan.sequence_length <= 32 and plan.embedding_size <= 32,
+             "attention dimensions must fit one padded 32x32 tile")
+    _require(len(abi.input_slots) == 4 and type(abi.output_index) is int and
+             0 <= abi.output_index < 64, "attention ABI requires four slots and a valid output index")
+    _validate_tile_abi(abi.input_slots, abi.input_base, abi.output_base)
+    q_slot, k_slot, v_slot, mask_slot = abi.input_slots
+    scale = _bf16_bits(math.log2(math.e) / math.sqrt(plan.embedding_size))
+    lines = [
+        "module {",
+        f'  func.func @ttir_{plan.function}_atlas() -> !atlas.virtual_state attributes {{atlas.input_dram_base = {abi.input_base} : i64, atlas.output_dram_base = {abi.output_base} : i64}} {{',
+        '    %io0 = "atlas.virtual_start"() : () -> !atlas.virtual_state',
+        f'    %io1, %q = "atlas.virtual_input_fp8"(%io0) {{index = {q_slot} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_fp8)',
+        f'    %io2, %k = "atlas.virtual_input_fp8"(%io1) {{index = {k_slot} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_fp8)',
+        f'    %io3, %v = "atlas.virtual_input_fp8"(%io2) {{index = {v_slot} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_fp8)',
+        f'    %io4, %mask = "atlas.virtual_input_bf16"(%io3) {{index = {mask_slot} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_bf16)',
+        '    %scores0 = "atlas.virtual_mxu_matmul"(%q, %k) {unit = 0 : i32} : (!atlas.virtual_fp8, !atlas.virtual_fp8) -> !atlas.virtual_bf16',
+        '    %scores = "atlas.virtual_vpu_binary"(%scores0, %mask) {kind = "add"} : (!atlas.virtual_bf16, !atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        '    %max = "atlas.virtual_vpu_reduce"(%scores) {kind = "row_max"} : (!atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        '    %shifted = "atlas.virtual_vpu_binary"(%scores, %max) {kind = "sub"} : (!atlas.virtual_bf16, !atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        f'    %scale = "atlas.virtual_vpu_splat"() {{bits = {scale} : i32}} : () -> !atlas.virtual_bf16',
+        '    %scaled = "atlas.virtual_vpu_binary"(%shifted, %scale) {kind = "mul"} : (!atlas.virtual_bf16, !atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        '    %e = "atlas.virtual_vpu_unary"(%scaled) {kind = "exp2"} : (!atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        '    %sum = "atlas.virtual_vpu_reduce"(%e) {kind = "row_sum"} : (!atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        '    %inverse = "atlas.virtual_vpu_unary"(%sum) {kind = "recip"} : (!atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        '    %p = "atlas.virtual_vpu_binary"(%e, %inverse) {kind = "mul"} : (!atlas.virtual_bf16, !atlas.virtual_bf16) -> !atlas.virtual_bf16',
+        '    %p8 = "atlas.virtual_pack_fp8"(%p) {scale_code = 127 : i32} : (!atlas.virtual_bf16) -> !atlas.virtual_fp8',
+        '    %v_t = "atlas.virtual_xlu_transpose"(%v) : (!atlas.virtual_fp8) -> !atlas.virtual_fp8',
+        '    %out = "atlas.virtual_mxu_matmul"(%p8, %v_t) {unit = 1 : i32} : (!atlas.virtual_fp8, !atlas.virtual_fp8) -> !atlas.virtual_bf16',
+        f'    %io5 = "atlas.virtual_output_bf16"(%io4, %out) {{index = {abi.output_index} : i32}} : (!atlas.virtual_state, !atlas.virtual_bf16) -> !atlas.virtual_state',
+        '    return %io5 : !atlas.virtual_state',
+        '  }', '}', '']
+    return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class AtlasTargetMapper:
+    """Atlas backend for the target-neutral workload plans in this prototype."""
+
+    matmul_abi: AtlasTileABI = AtlasTileABI()
+    mlp_abi: AtlasMlpABI = AtlasMlpABI()
+    linear_abi: AtlasLinearReluABI = AtlasLinearReluABI()
+    attention_abi: AtlasAttentionABI = AtlasAttentionABI()
+    numerical_policy: str | None = None
+
+    def map(self, plan: TritonWorkloadPlan) -> str:
+        if isinstance(plan, MatmulRelu):
+            return map_matmul_relu(plan, self.matmul_abi)
+        if isinstance(plan, TwoLayerMlp):
+            return map_two_layer_mlp(plan, self.mlp_abi,
+                                     numerical_policy=self.numerical_policy)
+        if isinstance(plan, LinearRelu):
+            return map_linear_relu(plan, self.linear_abi,
+                                   numerical_policy=self.numerical_policy)
+        if isinstance(plan, ScaledDotProductAttention):
+            return map_attention(plan, self.attention_abi,
+                                 numerical_policy=self.numerical_policy)
+        raise TypeError(f"Atlas mapper does not support plan {type(plan).__name__}")
+
+
+@dataclass(frozen=True)
+class AtlasMatmulReluMapper:
+    """Compatibility adapter for callers of the original mapper interface."""
+
+    abi: AtlasTileABI = AtlasTileABI()
+
+    def map_matmul_relu(self, plan: MatmulRelu) -> str:
+        return map_matmul_relu(plan, self.abi)

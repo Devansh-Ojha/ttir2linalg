@@ -7,6 +7,8 @@ consume.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+import re
 from typing import Optional
 
 from compiler.ttir_model import TFunc, TOp, TValue
@@ -128,6 +130,45 @@ class TwoLayerMlp:
     store: TOp
 
 
+@dataclass(frozen=True)
+class LinearRelu:
+    """One vector dot product, bias add, ReLU, and scalar store per program."""
+
+    function: str
+    x_load: TOp
+    weight_load: TOp
+    bias_load: TOp
+    multiply: TOp
+    reduction: TOp
+    bias_add: TOp
+    relu: TOp
+    store: TOp
+    input_features: int
+
+
+@dataclass(frozen=True)
+class ScaledDotProductAttention:
+    """One Triton attention query with a static K/V sequence and softmax."""
+
+    function: str
+    query_load: TOp
+    key_load: TOp
+    value_load: TOp
+    query_key_mul: TOp
+    score_reduce: TOp
+    score_scale: TOp
+    max_reduce: TOp
+    subtract: TOp
+    exp: TOp
+    softmax_sum: TOp
+    normalize: TOp
+    probability_value_mul: TOp
+    output_reduce: TOp
+    store: TOp
+    sequence_length: int
+    embedding_size: int
+
+
 def analyze_two_layer_mlp(function: TFunc) -> TwoLayerMlp:
     """Admit only a straight-line, bias-free 32x32 E4M3FN two-dot graph."""
     def check(condition, message):
@@ -208,3 +249,207 @@ def analyze_two_layer_mlp(function: TFunc) -> TwoLayerMlp:
             defining = definitions.get(value.id)
             check(defining is None or positions[id(defining)] < positions[id(op)], "non-dominating SSA dependency")
     return TwoLayerMlp(function.name, inputs, (dot0, dot1), (first, final), relu, pack, store)
+
+
+def _definitions(ops: list[TOp]) -> dict[int, TOp]:
+    return {value.id: op for op in ops for value in op.results}
+
+
+def _depends(value: TValue, target: TValue, definitions: dict[int, TOp], seen=None) -> bool:
+    if value.id == target.id:
+        return True
+    seen = set() if seen is None else seen
+    if value.id in seen:
+        return False
+    seen.add(value.id)
+    producer = definitions.get(value.id)
+    return bool(producer and any(_depends(v, target, definitions, seen)
+                                 for v in producer.operands))
+
+
+def _reduce_body_is(op: TOp, operation: str) -> bool:
+    if not op.regions or not op.regions[0] or len(op.regions[0]) != 1:
+        return False
+    body = op.regions[0][0]
+    returns = [nested for nested in body.ops if nested.name == "tt.reduce.return"]
+    arithmetic = [nested for nested in body.ops if nested.name.startswith("arith.")]
+    return len(returns) == 1 and len(arithmetic) == 1 and arithmetic[0].name == operation
+
+
+def _has_only_names(ops: list[TOp], allowed: set[str]) -> bool:
+    return all(op.name in allowed for op in ops)
+
+
+def analyze_linear_relu(function: TFunc) -> LinearRelu:
+    """Recognize the checked-in per-output FC + bias + ReLU Triton kernel.
+
+    The plan intentionally describes semantic operands only. Launch dimensions,
+    padding and the FP8/BF16 target policy are supplied by the Atlas mapping.
+    """
+    ops = function.body.ops
+    definitions = _definitions(ops)
+    loads = [op for op in ops if op.name == "tt.load" and len(op.results) == 1]
+    stores = [op for op in ops if op.name == "tt.store"]
+    multiplies = [op for op in ops if op.name == "arith.mulf" and len(op.results) == 1]
+    reductions = [op for op in ops if op.name == "tt.reduce" and len(op.results) == 1]
+    adds = [op for op in ops if op.name == "arith.addf" and len(op.results) == 1]
+    relus = [op for op in ops if op.name in _MAX_OPS and len(op.results) == 1]
+
+    def check(condition, message):
+        if not condition:
+            raise NotImplementedError("linear ReLU: " + message)
+
+    check(len(loads) == 3 and len(stores) == 1, "expected three direct loads and one store")
+    check(len(multiplies) == 1 and len(reductions) == 1 and len(relus) == 1,
+          "expected one multiply, sum reduction and ReLU")
+    check(len(adds) == 1, "expected one bias add outside the reduction region")
+    check(_has_only_names(ops, {
+        "tt.get_program_id", "tt.make_range", "tt.splat", "tt.addptr", "tt.load",
+        "tt.expand_dims", "tt.broadcast", "tt.reshape", "tt.reduce", "arith.constant",
+        "arith.muli", "arith.mulf", "arith.addf", "arith.maxnumf", "tt.store", "tt.return",
+    }), "unsupported operation in the FC + bias + ReLU kernel")
+    returns = [op for op in ops if op.name == "tt.return"]
+    check(len(returns) == 1 and returns[0] is ops[-1], "expected one final void return")
+    vector_loads = [op for op in loads if op.results[0].type.kind == "tensor" and
+                    len(op.results[0].type.shape) == 1]
+    scalar_loads = [op for op in loads if op.results[0].type.kind == "scalar"]
+    check(len(vector_loads) == 2 and len(scalar_loads) == 1,
+          "expected two rank-one input/weight loads and one scalar bias load")
+    x_load, weight_load = vector_loads
+    bias_load = scalar_loads[0]
+    x, weight = x_load.results[0], weight_load.results[0]
+    multiply = multiplies[0]
+    check(len(multiply.operands) == 2 and all(
+        any(v.id == loaded.id for v in multiply.operands) for loaded in (x, weight)),
+        "multiply must consume the loaded input and weight vectors")
+    check(x.type.shape == weight.type.shape and x.type.shape[0] > 0,
+          "input and weight reduction extents must agree")
+    reduction = reductions[0]
+    check(reduction.attrs.get("axis", "0 : i32").split(":")[0].strip() == "0" and
+          _reduce_body_is(reduction, "arith.addf") and len(reduction.results) == 1 and
+          _depends(reduction.operands[0], multiply.results[0], definitions),
+          "vector multiply must feed an axis-zero sum")
+    bias_add_candidates = [op for op in adds if any(
+        _depends(value, reduction.results[0], definitions) for value in op.operands) and
+        any(value.id == bias_load.results[0].id for value in op.operands)]
+    check(len(bias_add_candidates) == 1, "sum must be added to the loaded bias")
+    bias_add = bias_add_candidates[0]
+    zero_values = [value for op in ops if op.name == "arith.constant" for value in op.results
+                   if _is_zero(value, definitions)]
+    relu = relus[0]
+    check(len(relu.operands) == 2 and any(
+        _depends(value, bias_add.results[0], definitions) for value in relu.operands) and
+        any(value.id in {v.id for v in zero_values} for value in relu.operands),
+        "bias sum must feed max with zero")
+    check(len(stores[0].operands) == 2 and any(
+        _depends(value, relu.results[0], definitions) for value in stores[0].operands),
+        "ReLU result must feed the only store")
+    check(len(function.args) == 4, "expected input, weight, bias and output pointer arguments")
+    return LinearRelu(function.name, x_load, weight_load, bias_load, multiply,
+                      reduction, bias_add, relu, stores[0], x.type.shape[0])
+
+
+def analyze_attention(function: TFunc) -> ScaledDotProductAttention:
+    """Recognize the checked-in 4-key, 8-feature single-query attention TTIR."""
+    ops = function.body.ops
+    definitions = _definitions(ops)
+    loads = [op for op in ops if op.name == "tt.load" and len(op.results) == 1]
+    stores = [op for op in ops if op.name == "tt.store"]
+    reductions = [op for op in ops if op.name == "tt.reduce" and len(op.results) == 1]
+    multiplies = [op for op in ops if op.name == "arith.mulf" and len(op.results) == 1]
+
+    def check(condition, message):
+        if not condition:
+            raise NotImplementedError("attention: " + message)
+
+    check(len(loads) == 3 and len(stores) == 1 and len(function.args) == 4,
+          "expected query/key/value loads, one output store, and four pointer arguments")
+    vectors = [op for op in loads if op.results[0].type.shape == (8,)]
+    matrices = [op for op in loads if op.results[0].type.shape == (4, 8)]
+    check(len(vectors) == 1 and len(matrices) == 2,
+          "supported shape is one 8-feature query and 4x8 key/value tiles")
+    query_load = vectors[0]
+    # Key and value have identical types; identify them by their use in the
+    # score and weighted-value branches below instead of textual SSA names.
+    check(len(reductions) == 4 and len(multiplies) == 3,
+          "expected QK, softmax, and PV reduction sequence")
+    check(_has_only_names(ops, {
+        "tt.get_program_id", "tt.make_range", "tt.splat", "tt.addptr", "tt.load",
+        "tt.expand_dims", "tt.broadcast", "tt.reduce", "arith.constant", "arith.muli",
+        "arith.mulf", "arith.subf", "math.exp", "arith.divf", "tt.store", "tt.return",
+    }), "unsupported operation in the bounded attention kernel")
+    check(sum(op.name == "arith.subf" for op in ops) == 1 and
+          sum(op.name == "arith.divf" for op in ops) == 1 and
+          sum(op.name == "math.exp" for op in ops) == 1,
+          "expected one stable softmax subtract, exponential, and normalization")
+    check(all(len(op.operands) == 1 and not op.attrs for op in loads),
+          "masked or attributed loads are unsupported")
+    score_mul = next((op for op in multiplies if tuple(op.results[0].type.shape) == (4, 8) and
+                      any(_depends(v, query_load.results[0], definitions) for v in op.operands)), None)
+    check(score_mul is not None, "query must participate in the QK product")
+    score_loads = [op for op in matrices if any(_depends(v, op.results[0], definitions)
+                                                 for v in score_mul.operands)]
+    check(len(score_loads) == 1, "QK product must consume exactly one loaded key tile")
+    key_load = score_loads[0]
+    value_load = next(op for op in matrices if op is not key_load)
+
+    def reduction_of(axis, value, body_op, result_shape=None):
+        matches = [op for op in reductions if op.attrs.get("axis", "").split(":")[0].strip() == str(axis)
+                   and _reduce_body_is(op, body_op) and
+                   (result_shape is None or op.results[0].type.shape == result_shape) and
+                   _depends(op.operands[0], value, definitions)]
+        check(len(matches) == 1, f"expected one axis-{axis} {body_op} reduction")
+        return matches[0]
+
+    score_reduce = reduction_of(1, score_mul.results[0], "arith.addf", (4,))
+    scaled_candidates = [op for op in multiplies if op.results[0].type.shape == (4,) and any(
+        _depends(v, score_reduce.results[0], definitions) for v in op.operands)]
+    check(len(scaled_candidates) == 1, "QK sum must be scaled once")
+    score_scale = scaled_candidates[0]
+    scale_inputs = [v for v in score_scale.operands
+                    if not _depends(v, score_reduce.results[0], definitions)]
+    check(len(scale_inputs) == 1, "score scaling must use one constant")
+    scale_def = definitions.get(scale_inputs[0].id)
+    scale_text = scale_def.attrs.get("value", "") if scale_def is not None else ""
+    match = re.search(r"dense<\s*([-+0-9.eE]+)\s*>", scale_text)
+    check(scale_def is not None and scale_def.name == "arith.constant" and match is not None,
+          "attention score scale must be a static dense constant")
+    source_scale = float(match.group(1))
+    expected_scale = 1.0 / math.sqrt(8.0)
+    check(abs(source_scale - expected_scale) <= 1e-6,
+          "score scale must be 1/sqrt(8) for this static kernel")
+    max_reduce = reduction_of(0, score_scale.results[0], "arith.maxnumf")
+    subtracts = [op for op in ops if op.name == "arith.subf" and len(op.results) == 1 and
+                 len(op.operands) == 2 and
+                 _depends(op.operands[0], score_scale.results[0], definitions) and
+                 _depends(op.operands[1], max_reduce.results[0], definitions)]
+    check(len(subtracts) == 1, "softmax must subtract the row maximum")
+    exps = [op for op in ops if op.name == "math.exp" and len(op.results) == 1 and
+            _depends(op.operands[0], subtracts[0].results[0], definitions)]
+    check(len(exps) == 1, "shifted scores must feed math.exp")
+    softmax_sum = reduction_of(0, exps[0].results[0], "arith.addf", ())
+    normalizers = [op for op in ops if op.name == "arith.divf" and len(op.results) == 1 and
+                   len(op.operands) == 2 and
+                   _depends(op.operands[0], exps[0].results[0], definitions) and
+                   _depends(op.operands[1], softmax_sum.results[0], definitions)]
+    check(len(normalizers) == 1, "softmax exponential must be normalized by its row sum")
+    pv_candidates = [op for op in multiplies if any(
+        _depends(v, normalizers[0].results[0], definitions) for v in op.operands) and any(
+        _depends(v, value_load.results[0], definitions) for v in op.operands)]
+    check(len(pv_candidates) == 1, "softmax probabilities must multiply the loaded values")
+    pv_mul = pv_candidates[0]
+    output_reduce = reduction_of(0, pv_mul.results[0], "arith.addf", (8,))
+    check(len(output_reduce.results[0].type.shape) == 1 and
+          output_reduce.results[0].type.shape == (8,), "attention output must have 8 features")
+    check(any(_depends(v, output_reduce.results[0], definitions) for v in stores[0].operands),
+          "attention output reduction must feed the only store")
+    check(len(ops) <= 60 and
+          len([op for op in ops if op.name in {"tt.load", "tt.store", "tt.reduce",
+                                              "arith.mulf", "arith.subf", "arith.divf", "math.exp"}]) == 14,
+          "unexpected extra or unsupported operations in the bounded attention kernel")
+    returns = [op for op in ops if op.name == "tt.return"]
+    check(len(returns) == 1 and returns[0] is ops[-1], "expected one final void return")
+    return ScaledDotProductAttention(
+        function.name, query_load, key_load, value_load, score_mul, score_reduce,
+        score_scale, max_reduce, subtracts[0], exps[0], softmax_sum,
+        normalizers[0], pv_mul, output_reduce, stores[0], 4, 8)
