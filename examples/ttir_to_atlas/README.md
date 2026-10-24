@@ -23,6 +23,26 @@ policy. The frontend does not lower arbitrary TTIR pointer arithmetic, perform
 runtime input movement, or implement whole-model allocation. Atlas-MLIR owns
 virtual-op scheduling, register allocation, and instruction emission.
 
+## PyTorch-exported HGraph dense path
+
+`compiler.hgraph_to_atlas` also maps the serialized `torch.export` HGraph for
+biased one-layer Linear+ReLU and two-layer MLP graphs. For example, after
+`compiler.inductor_capture --model mlp` has written `workload.json`:
+
+```bash
+PYTHONPATH=. python -m compiler.hgraph_to_atlas \
+  out/inductor/mlp/workload.json \
+  --numerical-policy atlas-fp8-pytorch-dense-v1 \
+  --out out/atlas/pytorch_mlp.virtual.mlir
+```
+
+[`pytorch_mlp.virtual.mlir`](pytorch_mlp.virtual.mlir) is the generated fixture.
+The HGraph is produced by `torch.export`; this route currently maps the graph
+semantics directly and does not use or associate Inductor's generated kernels.
+The caller pads and stages activation/weight tiles as E4M3FN and bias tiles as
+BF16. The BF16 hidden activation is packed to FP8 with scale code 127 before
+the second MXU operation, so this is an explicit lossy precision policy.
+
 With Triton's `libtriton` available, generate Atlas virtual MLIR from a
 matching TTIR capture:
 

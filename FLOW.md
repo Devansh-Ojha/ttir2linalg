@@ -9,12 +9,15 @@ the existing paths.
 | Path | Role |
 | --- | --- |
 | `model/` | Small PyTorch example models used by the pipeline. |
+| `compiler/inductor_capture.py` | Runs the actual Inductor backend and saves generated code, an exported HGraph, and capture metadata. |
 | `kernels/` | Explicit Triton kernels used for source capture and TTIR compilation. |
 | `mlp_pipeline.py` | Top-level driver for model export, Triton source/TTIR capture, and HGraph output. |
 | `compiler/ttir_model.py` | Target-neutral data classes used by the parsed TTIR representation. |
 | `compiler/ttir_reader.py` | Uses Triton's `libtriton` to parse/verify TTIR and expose functions, blocks, operations, values, types, and attributes. |
 | `compiler/hgir.py` | Small hardware-agnostic graph representation and verifier. |
 | `compiler/hgir_from_fx.py` | Converts an exported PyTorch FX graph into HGraph. |
+| `compiler/hgraph_analysis.py` | Classifies HGraph MLP, attention, and Transformer workload structure without target mapping. |
+| `compiler/hgraph_atlas_mapping.py`, `compiler/hgraph_to_atlas.py` | Maps serialized `torch.export` dense HGraphs to Atlas virtual SSA under an explicit FP8/BF16 policy. |
 | `compiler/hgir_from_ttir.py` | Converts parsed TTIR into HGraph for inspection and downstream experiments. |
 | `compiler/linalg_lowering.py`, `compiler/real_mlir.py` | Existing TTIR-to-Linalg/MLIR prototype path. |
 | `compiler/triton_analysis.py` | Recognizes bounded linear + ReLU, two-layer MLP, attention, and matmul + ReLU plans without Atlas-specific emission. |
@@ -39,6 +42,44 @@ compiler/hgir_from_fx.py ──► compiler/hgir.py ──► .hgir
 
 This path describes the exported PyTorch graph in the project's neutral HGraph
 format. It does not preserve or create an Atlas virtual kernel today.
+
+## Actual Inductor capture path
+
+```text
+model/linear_relu.py, model/mlp.py, model/attention.py,
+model/transformer_block.py
+    │
+    ▼
+compiler/inductor_capture.py
+    ├── torch.compile(..., backend="inductor") ──► backend-generated code
+    │                                               └► embedded Triton sources (if any)
+    ├── eager comparison                         ──► numerical check
+    └── torch.export + hgir_from_fx              ──► workload.hgir
+                                                     capture.json
+```
+
+This is a genuine Inductor invocation. The emitted code is backend-dependent:
+CPU commonly emits C++, while CUDA may emit Triton kernels. The graph artifact
+is currently exported independently from Inductor's generated code, and this
+new path is not yet connected to TTIR, Linalg, SE-level IR, or Atlas mapping.
+Attention uses `need_weights=False` to request SDPA; the report's source matches
+are evidence to inspect and do not by themselves prove that FlashAttention
+was selected.
+
+The Transformer target is to fuse attention and feed-forward work into one
+monolithic launch where the selected backend permits it, while counting actual
+generated kernels separately from FX graph regions. A single graph is not
+evidence of a single generated kernel.
+
+There is now a separate dense HGraph lowering path:
+
+```text
+torch.export HGraph → workload.json → hgraph_to_atlas.py → Atlas virtual SSA
+```
+
+It handles the biased single-layer Linear+ReLU and two-layer MLP patterns with
+an explicit Atlas precision policy. It does not consume the Inductor generated
+code; Transformer/SDPA HGraph mapping and the SE-level boundary are still open.
 
 ## Triton kernel to TTIR path
 

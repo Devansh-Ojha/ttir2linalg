@@ -11,7 +11,8 @@ import ast
 from pathlib import Path
 
 
-def _triton_sources_from_inductor_code(source_codes):
+def extract_inductor_triton_sources(source_codes):
+    """Extract embedded Triton kernel source from captured Inductor code."""
     sources = []
     for code in source_codes:
         for match in re.finditer(r"'''(.*?)'''", code, re.DOTALL):
@@ -63,7 +64,7 @@ def capture_model_triton_source(
 
     compiled = torch.compile(model, backend="inductor")
     source_codes = get_code(compiled, sample)
-    return _triton_sources_from_inductor_code(source_codes)
+    return extract_inductor_triton_sources(source_codes)
 
 
 def _explicit_model_triton_sources(model_name):

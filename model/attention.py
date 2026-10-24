@@ -14,7 +14,11 @@ class SimpleAttention(nn.Module):
         )
 
     def forward(self, x):
-        out, _ = self.attention(x, x, x)
+        # need_weights=False lets MultiheadAttention route through PyTorch's
+        # scaled_dot_product_attention implementation. Inductor can then select
+        # an available fused/FlashAttention backend for supported devices and
+        # shapes, while PyTorch retains its normal fallback behavior.
+        out, _ = self.attention(x, x, x, need_weights=False)
         return out
 
 

@@ -10,6 +10,16 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+def _json_value(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_json_value(item) for item in value]
+    return str(value)
+
+
 @dataclass
 class HValue:
     name: str
@@ -33,6 +43,61 @@ class HGraph:
     values: dict[str, HValue]
     ops: list[HOp]
     outputs: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        def value_dict(value: HValue):
+            return {
+                "name": value.name,
+                "type": value.type,
+                "shape": _json_value(value.shape),
+            }
+
+        def op_dict(op: HOp):
+            return {
+                "name": op.name,
+                "inputs": list(op.inputs),
+                "outputs": list(op.outputs),
+                "attrs": _json_value(op.attrs),
+                "regions": [[op_dict(nested) for nested in region]
+                            for region in op.regions],
+            }
+
+        return {
+            "format": "hgraph-v1",
+            "name": self.name,
+            "inputs": {key: value_dict(value)
+                       for key, value in self.inputs.items()},
+            "values": {key: value_dict(value)
+                       for key, value in self.values.items()},
+            "ops": [op_dict(op) for op in self.ops],
+            "outputs": list(self.outputs),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "HGraph":
+        if payload.get("format") != "hgraph-v1":
+            raise ValueError("unsupported HGraph format %r" % payload.get("format"))
+
+        def value_from_dict(data):
+            return HValue(data["name"], data["type"], tuple(data.get("shape", ())))
+
+        def op_from_dict(data):
+            return HOp(
+                data["name"], list(data["inputs"]), list(data["outputs"]),
+                dict(data.get("attrs", {})),
+                [[op_from_dict(nested) for nested in region]
+                 for region in data.get("regions", [])],
+            )
+
+        return cls(
+            name=payload["name"],
+            inputs={key: value_from_dict(value)
+                    for key, value in payload["inputs"].items()},
+            values={key: value_from_dict(value)
+                    for key, value in payload["values"].items()},
+            ops=[op_from_dict(op) for op in payload["ops"]],
+            outputs=list(payload["outputs"]),
+        )
 
     def verify(self) -> list[str]:
         errors: list[str] = []
@@ -90,6 +155,15 @@ class HGraph:
                 "  %s = %s(%s)%s" %
                 (", ".join(op.outputs), op.name, ", ".join(op.inputs), attrs)
             )
+            result_info = []
+            for output in op.outputs:
+                value = self.values.get(output)
+                if value is None:
+                    continue
+                shape = " " + str(value.shape) if value.shape else ""
+                result_info.append("%s: %s%s" % (output, value.type, shape))
+            if result_info:
+                lines[-1] += " -> " + ", ".join(result_info)
             for index, region in enumerate(op.regions):
                 region_args = op.attrs.get("region_args", [])
                 args = region_args[index] if index < len(region_args) else []
