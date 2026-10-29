@@ -1,0 +1,149 @@
+{
+  "model": "attention_flash",
+  "input_capture": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/capture.json",
+  "source": "compiler-dumped TTIR from PyTorch Inductor",
+  "inductor_wrapper_referenced_ttir_kernel_count": 6,
+  "mapped_kernel_count": 0,
+  "unsupported_kernel_count": 6,
+  "kernels": [
+    {
+      "source_ttir": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_000_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+      "source_origin": "pytorch_inductor_triton_dump",
+      "status": "unsupported",
+      "attempts": [
+        {
+          "pattern": "linear-relu",
+          "reason": "NotImplementedError: linear ReLU: expected three direct loads and one store"
+        },
+        {
+          "pattern": "attention",
+          "reason": "NotImplementedError: attention: expected query/key/value loads, one output store, and four pointer arguments"
+        },
+        {
+          "pattern": "matmul-relu",
+          "reason": "NotImplementedError: expected exactly one TTIR matmul + ReLU; found 0 matmul(s), 0 candidate(s)"
+        },
+        {
+          "pattern": "two-layer-mlp",
+          "reason": "NotImplementedError: two-layer MLP: unsupported store"
+        }
+      ]
+    },
+    {
+      "source_ttir": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_001_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+      "source_origin": "pytorch_inductor_triton_dump",
+      "status": "unsupported",
+      "attempts": [
+        {
+          "pattern": "linear-relu",
+          "reason": "NotImplementedError: linear ReLU: expected three direct loads and one store"
+        },
+        {
+          "pattern": "attention",
+          "reason": "NotImplementedError: attention: expected query/key/value loads, one output store, and four pointer arguments"
+        },
+        {
+          "pattern": "matmul-relu",
+          "reason": "NotImplementedError: expected exactly one TTIR matmul + ReLU; found 0 matmul(s), 0 candidate(s)"
+        },
+        {
+          "pattern": "two-layer-mlp",
+          "reason": "NotImplementedError: two-layer MLP: unsupported store"
+        }
+      ]
+    },
+    {
+      "source_ttir": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_002_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+      "source_origin": "pytorch_inductor_triton_dump",
+      "status": "unsupported",
+      "attempts": [
+        {
+          "pattern": "linear-relu",
+          "reason": "NotImplementedError: linear ReLU: expected three direct loads and one store"
+        },
+        {
+          "pattern": "attention",
+          "reason": "NotImplementedError: attention: expected query/key/value loads, one output store, and four pointer arguments"
+        },
+        {
+          "pattern": "matmul-relu",
+          "reason": "NotImplementedError: expected exactly one TTIR matmul + ReLU; found 0 matmul(s), 0 candidate(s)"
+        },
+        {
+          "pattern": "two-layer-mlp",
+          "reason": "NotImplementedError: two-layer MLP: unsupported store"
+        }
+      ]
+    },
+    {
+      "source_ttir": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_003_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+      "source_origin": "pytorch_inductor_triton_dump",
+      "status": "unsupported",
+      "attempts": [
+        {
+          "pattern": "linear-relu",
+          "reason": "NotImplementedError: linear ReLU: expected three direct loads and one store"
+        },
+        {
+          "pattern": "attention",
+          "reason": "NotImplementedError: attention: expected query/key/value loads, one output store, and four pointer arguments"
+        },
+        {
+          "pattern": "matmul-relu",
+          "reason": "NotImplementedError: expected exactly one TTIR matmul + ReLU; found 0 matmul(s), 0 candidate(s)"
+        },
+        {
+          "pattern": "two-layer-mlp",
+          "reason": "NotImplementedError: two-layer MLP: unsupported store"
+        }
+      ]
+    },
+    {
+      "source_ttir": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_004_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+      "source_origin": "pytorch_inductor_triton_dump",
+      "status": "unsupported",
+      "attempts": [
+        {
+          "pattern": "linear-relu",
+          "reason": "NotImplementedError: linear ReLU: expected three direct loads and one store"
+        },
+        {
+          "pattern": "attention",
+          "reason": "NotImplementedError: attention: expected query/key/value loads, one output store, and four pointer arguments"
+        },
+        {
+          "pattern": "matmul-relu",
+          "reason": "NotImplementedError: expected exactly one TTIR matmul + ReLU; found 0 matmul(s), 0 candidate(s)"
+        },
+        {
+          "pattern": "two-layer-mlp",
+          "reason": "NotImplementedError: two-layer MLP: unsupported store"
+        }
+      ]
+    },
+    {
+      "source_ttir": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_005_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+      "source_origin": "pytorch_inductor_triton_dump",
+      "status": "unsupported",
+      "attempts": [
+        {
+          "pattern": "linear-relu",
+          "reason": "NotImplementedError: linear ReLU: expected three direct loads and one store"
+        },
+        {
+          "pattern": "attention",
+          "reason": "NotImplementedError: attention: expected query/key/value loads, one output store, and four pointer arguments"
+        },
+        {
+          "pattern": "matmul-relu",
+          "reason": "NotImplementedError: expected exactly one TTIR matmul + ReLU; found 0 matmul(s), 0 candidate(s)"
+        },
+        {
+          "pattern": "two-layer-mlp",
+          "reason": "NotImplementedError: two-layer MLP: unsupported store"
+        }
+      ]
+    }
+  ],
+  "report_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/atlas/mapping.json"
+}

@@ -1,0 +1,144 @@
+{
+  "model": "attention_custom_flash",
+  "torch_version": "2.15.0+cu132",
+  "device": "cuda",
+  "dtype": "torch.float16",
+  "compile_mode": "run",
+  "physical_gpu_used": true,
+  "runtime_validated": true,
+  "compiler": "torch.compile(backend='inductor')",
+  "inductor_status": "captured",
+  "code_origin": "pytorch_inductor",
+  "code_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/inductor_00.py"
+  ],
+  "code_count": 1,
+  "inductor_kernel_launch_site_count": 1,
+  "inductor_kernel_launch_sites": [
+    {
+      "code_unit": 0,
+      "line": 156,
+      "kernel_symbol": "flash_attention_kernel_0",
+      "triton_function_symbol": "flash_attention_kernel"
+    }
+  ],
+  "generated_code_kinds": [
+    ".py"
+  ],
+  "inductor_triton_kernel_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/inductor_triton_00.py"
+  ],
+  "inductor_triton_kernel_count": 1,
+  "inductor_ttir_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/inductor_ttir/kernel_000_flash_attention_kernel.ttir"
+  ],
+  "inductor_ttir_kernel_count": 1,
+  "inductor_wrapper_referenced_ttir_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/inductor_ttir/kernel_000_flash_attention_kernel.ttir"
+  ],
+  "inductor_wrapper_referenced_ttir_kernel_count": 1,
+  "inductor_unassociated_ttir_artifacts": [],
+  "inductor_ttir_launch_associations": [
+    {
+      "ttir_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/inductor_ttir/kernel_000_flash_attention_kernel.ttir",
+      "ttir_symbols": [
+        "flash_attention_kernel"
+      ],
+      "matched_launch_symbols": [
+        "flash_attention_kernel_0"
+      ]
+    }
+  ],
+  "inductor_kernel_launch_symbols": [
+    "flash_attention_kernel_0"
+  ],
+  "inductor_ttir_origin": "triton_compiler_dump",
+  "numerical_match": true,
+  "inductor_error": null,
+  "code_capture_error": null,
+  "hgraph_origin": "torch.export",
+  "hgraph_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/workload.hgir",
+  "hgraph_json_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/workload.json",
+  "hgraph_op_count": 13,
+  "hgraph_error": null,
+  "workload_analysis": {
+    "pattern": "unclassified",
+    "operation_counts": {
+      "custom_flash_attention": 1,
+      "linear": 4,
+      "transpose": 4,
+      "view": 4
+    },
+    "has_scaled_dot_product_attention": false,
+    "has_residual_add": false,
+    "has_normalization": false,
+    "has_gelu": false,
+    "input_shapes": {
+      "p_q_proj_weight": [
+        32,
+        32
+      ],
+      "p_q_proj_bias": [
+        32
+      ],
+      "p_k_proj_weight": [
+        32,
+        32
+      ],
+      "p_k_proj_bias": [
+        32
+      ],
+      "p_v_proj_weight": [
+        32,
+        32
+      ],
+      "p_v_proj_bias": [
+        32
+      ],
+      "p_out_proj_weight": [
+        32,
+        32
+      ],
+      "p_out_proj_bias": [
+        32
+      ],
+      "x": [
+        1,
+        32,
+        32
+      ]
+    },
+    "output_shapes": {
+      "linear_3": [
+        1,
+        32,
+        32
+      ]
+    }
+  },
+  "atlas_virtual_ops_emitted": false,
+  "custom_triton_kernel_source": "/home/grammy/blast/triton-shit/ttir2linalg/kernels/flash_attention.py",
+  "custom_triton_kernel": "flash_attention_kernel (online softmax)",
+  "custom_kernel_numerical_validation": "passed",
+  "attention_request": "custom Triton online-softmax FlashAttention",
+  "attention_implementation": "repository_triton_flash_attention",
+  "correctness_reference": "PyTorch math SDPA with identical learned projections",
+  "correctness_check_passed": true,
+  "correctness_check_scope": "compiled output compared to independent PyTorch math-SDPA reference",
+  "attention_backend_constraint": "not_applicable",
+  "flash_attention_backend_compiled_under_constraint": false,
+  "flash_attention_backend_forced_and_run_succeeded": false,
+  "attention_backend_evidence": [
+    "# Original path: /home/grammy/blast/triton-shit/ttir2linalg/kernels/flash_attention.py:6",
+    "flash_attention_kernel_0 = async_compile.triton('flash_attention_kernel', '''",
+    "inductor_meta={'grid_type': 'FixedGrid', 'fixed_grid': ['_grid_0', '_grid_1', '_grid_2'], 'extra_launcher_args': ['_grid_0', '_grid_1', '_grid_2'], 'declared_constexpr_names': ['SEQ', 'HEADS', 'HEAD_DIM', 'stride_qb', 'stride_qh', 'stride_qm', 'stride_kb', 'stride_kh', 'stride_kn', 'stride_vb', 'stride_vh', 'stride_vn', 'stride_ob', 'stride_oh', 'stride_om', 'BLOCK_M', 'BLOCK_N', 'BLOCK_D'], 'kernel_name': 'flash_attention_kernel_0', 'backend_hash': '99112F46E34FFE0C7B9EA02CA7CCE3EA132FFF264769496D789923144AFED6EF', 'assert_indirect_indexing': True, 'autotune_local_cache': True, 'autotune_pointwise': True, 'autotune_remote_cache': None, 'force_disable_caches': False, 'dynamic_scale_rblock': True, 'incremental_autotune': False, 'max_autotune': False, 'max_autotune_pointwise': False, 'min_split_scan_rblock': 256, 'spill_threshold': 16, 'store_cubin': False, 'deterministic': False, 'batch_invariant': False, 'force_filter_reduction_configs': False, 'mix_order_reduction_allow_multi_stages': True, 'dynamic_disable_pipelining': True, 'are_deterministic_algorithms_enabled': False},",
+    "def flash_attention_kernel(",
+    "flash_attention_kernel_0.run(reinterpret_tensor(buf0, (1, 1, 32, 32), (1024, 32, 32, 1), 0), reinterpret_tensor(buf1, (1, 1, 32, 32), (1024, 32, 32, 1), 0), reinterpret_tensor(buf2, (1, 1, 32, 32), (1024, 32, 32, 1), 0), reinterpret_tensor(buf3, (1, 1, 32, 32), (1024, 32, 32, 1), 0), 2, 1, 1, stream=raw_stream0)"
+  ],
+  "flash_attention_kernel_detected_in_generated_code": true,
+  "flash_attention_kernel_detected_in_ttir": true,
+  "report_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/capture.json",
+  "atlas_mapping_status": "no_supported_kernels",
+  "atlas_mapping_report": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/atlas/mapping.json",
+  "atlas_mapped_kernel_count": 0
+}

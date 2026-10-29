@@ -1,0 +1,34 @@
+{
+  "model": "attention_custom_flash",
+  "input_capture": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/capture.json",
+  "source": "compiler-dumped TTIR from PyTorch Inductor",
+  "inductor_wrapper_referenced_ttir_kernel_count": 1,
+  "mapped_kernel_count": 0,
+  "unsupported_kernel_count": 1,
+  "kernels": [
+    {
+      "source_ttir": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/inductor_ttir/kernel_000_flash_attention_kernel.ttir",
+      "source_origin": "pytorch_inductor_triton_dump",
+      "status": "unsupported",
+      "attempts": [
+        {
+          "pattern": "linear-relu",
+          "reason": "NotImplementedError: linear ReLU: expected one multiply, sum reduction and ReLU"
+        },
+        {
+          "pattern": "attention",
+          "reason": "NotImplementedError: attention: supported shape is one 8-feature query and 4x8 key/value tiles"
+        },
+        {
+          "pattern": "matmul-relu",
+          "reason": "NotImplementedError: expected exactly one TTIR matmul + ReLU; found 2 matmul(s), 0 candidate(s)"
+        },
+        {
+          "pattern": "two-layer-mlp",
+          "reason": "NotImplementedError: two-layer MLP: regions/control flow are unsupported"
+        }
+      ]
+    }
+  ],
+  "report_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_custom_flash/atlas/mapping.json"
+}

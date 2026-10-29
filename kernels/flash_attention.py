@@ -49,7 +49,7 @@ def flash_attention_kernel(
         alpha = tl.exp(running_max - new_max)
         probs = tl.exp(scores - new_max[:, None])
         running_sum = running_sum * alpha + tl.sum(probs, axis=1)
-        running_acc = running_acc * alpha[:, None] + tl.dot(probs, v)
+        running_acc = running_acc * alpha[:, None] + tl.dot(probs.to(v.dtype), v)
         running_max = new_max
     result = running_acc / running_sum[:, None]
     tl.store(

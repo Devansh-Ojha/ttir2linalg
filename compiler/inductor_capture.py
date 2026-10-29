@@ -21,6 +21,12 @@ from compiler.hgraph_analysis import analyze_hgraph
 from compiler.triton_capture import extract_inductor_triton_sources
 
 
+_ATTENTION_MODELS = {
+    "attention", "attention_flash", "attention_custom_flash",
+    "attention_mlp", "transformer_block",
+}
+
+
 def _model_and_input(name: str, *, input_size: int, hidden_size: int,
                      output_size: int, sequence_length: int,
                      embed_size: int, num_heads: int):
@@ -67,6 +73,12 @@ def _launch_sites(code_units: list[str]) -> list[dict[str, Any]]:
     """Collect generated wrapper call sites for Triton kernel launches."""
     sites = []
     for unit_index, code in enumerate(code_units):
+        # User-defined Triton kernels can have a suffixed wrapper variable
+        # while async_compile retains the original TTIR function name.
+        bindings = dict(re.findall(
+            r"\b([A-Za-z_]\w*)\s*=\s*async_compile\.triton\(\s*['\"]([A-Za-z_]\w*)['\"]",
+            code,
+        ))
         for line_number, line in enumerate(code.splitlines(), 1):
             match = re.search(r"\b([A-Za-z_]\w*)\.run\(", line)
             if match:
@@ -74,6 +86,7 @@ def _launch_sites(code_units: list[str]) -> list[dict[str, Any]]:
                     "code_unit": unit_index,
                     "line": line_number,
                     "kernel_symbol": match.group(1),
+                    "triton_function_symbol": bindings.get(match.group(1), match.group(1)),
                 })
     return sites
 
@@ -105,7 +118,9 @@ def _make_fake_cuda_model(torch, model_name: str, *, input_size: int,
                 output_size=output_size, sequence_length=sequence_length,
                 embed_size=embed_size, num_heads=num_heads,
             )
-            sample = torch.randn(*shape, device="cuda")
+            dtype = torch.float16 if model_name in _ATTENTION_MODELS else torch.get_default_dtype()
+            model = model.to(dtype=dtype)
+            sample = torch.randn(*shape, device="cuda", dtype=dtype)
     except Exception as exc:
         raise RuntimeError(
             "could not create fake CUDA model/input; install a CUDA-enabled "
@@ -123,7 +138,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     """Compile through Inductor; CUDA AOT mode does not execute on a device."""
     if mode not in {"aot-cuda", "run"}:
         raise ValueError("mode must be 'aot-cuda' or 'run'")
-    output = Path(out_dir)
+    output = Path(out_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
     # Triton reads these settings during import. Set them before importing
     # torch/model modules so Triton dumps TTIR while Inductor compiles its
@@ -156,8 +171,12 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
             embed_size=embed_size, num_heads=num_heads,
         )
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = model.to(device)
-        sample = torch.randn(*shape, device=device)
+        # CUDA FlashAttention requires FP16 or BF16 inputs, including the
+        # learned projections. Keep the CPU and non-attention defaults.
+        dtype = (torch.float16 if device == "cuda" and model_name in _ATTENTION_MODELS
+                 else torch.get_default_dtype())
+        model = model.to(device=device, dtype=dtype)
+        sample = torch.randn(*shape, device=device, dtype=dtype)
 
     graph_path = output / "workload.hgir"
     graph_json_path = output / "workload.json"
@@ -198,14 +217,18 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
             inductor_config.trace.enabled = True
             inductor_config.trace.debug_dir = str((output / "torch_compile_debug").resolve())
             compiled = torch.compile(model, backend="inductor", fullgraph=True)
-            with attention_context:
+            with torch.no_grad(), attention_context:
                 compiled.forward.aot_compile(((sample,), {}))
         else:
+            from torch._inductor.utils import run_and_get_code
+
             compiled = torch.compile(model, backend="inductor")
-            with attention_context:
+            # The custom kernel implements inference only; eval() alone does
+            # not stop AOTAutograd from requesting an unregistered backward.
+            with torch.no_grad(), attention_context:
                 reference = getattr(model, "reference_forward", model)
                 expected = reference(sample)
-                actual = compiled(sample)
+                actual, code_units = run_and_get_code(compiled, sample)
             torch.testing.assert_close(actual, expected, rtol=1e-3, atol=1e-3)
             numerical_match = True
         compile_succeeded = True
@@ -222,17 +245,6 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
                     "AOT compile succeeded but no output_code.py appeared in "
                     "the configured Inductor debug directory"
                 )
-        else:
-            try:
-                from torch._inductor.utils import get_code
-
-                code_units = get_code(compiled, sample)
-                if not code_units:
-                    raise RuntimeError(
-                        "Inductor completed but its code capture returned no artifacts"
-                    )
-            except Exception as exc:
-                code_capture_error = "%s: %s" % (type(exc).__name__, exc)
 
     code_paths: list[str] = []
     for index, code in enumerate(code_units):
@@ -264,7 +276,6 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     referenced_ttir_paths = []
     unassociated_ttir_paths = []
     ttir_launch_associations = []
-    launch_symbols = {site["kernel_symbol"] for site in launch_sites}
     if triton_dump_dir.exists():
         emitted_ttir_dir = output / "inductor_ttir"
         for index, source_path in enumerate(sorted(triton_dump_dir.rglob("*.ttir"))):
@@ -273,7 +284,10 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
             shutil.copyfile(source_path, target)
             dumped_ttir_paths.append(str(target))
             ttir_symbols = sorted(_ttir_function_symbols(target))
-            matched_symbols = sorted(launch_symbols.intersection(ttir_symbols))
+            matched_symbols = sorted({
+                site["kernel_symbol"] for site in launch_sites
+                if site["triton_function_symbol"] in ttir_symbols
+            })
             ttir_launch_associations.append({
                 "ttir_artifact": str(target),
                 "ttir_symbols": ttir_symbols,
@@ -288,6 +302,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         "model": model_name,
         "torch_version": torch.__version__,
         "device": device,
+        "dtype": str(sample.dtype),
         "compile_mode": mode,
         "physical_gpu_used": mode == "run" and device == "cuda",
         "runtime_validated": numerical_match is True,
@@ -310,7 +325,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         "inductor_wrapper_referenced_ttir_kernel_count": len(referenced_ttir_paths),
         "inductor_unassociated_ttir_artifacts": unassociated_ttir_paths,
         "inductor_ttir_launch_associations": ttir_launch_associations,
-        "inductor_kernel_launch_symbols": sorted(launch_symbols),
+        "inductor_kernel_launch_symbols": sorted({site["kernel_symbol"] for site in launch_sites}),
         "inductor_ttir_origin": "triton_compiler_dump" if dumped_ttir_paths else None,
         "numerical_match": numerical_match,
         "inductor_error": compile_error,

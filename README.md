@@ -59,6 +59,8 @@ result and the ready-made FlashAttention result are compared to an independent
 PyTorch math-SDPA reference with identical learned projections. A successful
 fake-tensor AOT compile checks code generation only; it cannot establish
 numerical correctness because it does not execute the kernels.
+CUDA attention captures use FP16 model parameters and inputs, as required by
+the ready-made FlashAttention backend; `capture.json` records the input dtype.
 
 The workload names are:
 

@@ -1,0 +1,228 @@
+{
+  "model": "attention_flash",
+  "torch_version": "2.15.0+cu132",
+  "device": "cuda",
+  "dtype": "torch.float16",
+  "compile_mode": "run",
+  "physical_gpu_used": true,
+  "runtime_validated": true,
+  "compiler": "torch.compile(backend='inductor')",
+  "inductor_status": "captured",
+  "code_origin": "pytorch_inductor",
+  "code_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_00.py"
+  ],
+  "code_count": 1,
+  "inductor_kernel_launch_site_count": 3,
+  "inductor_kernel_launch_sites": [
+    {
+      "code_unit": 0,
+      "line": 228,
+      "kernel_symbol": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0",
+      "triton_function_symbol": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0"
+    },
+    {
+      "code_unit": 0,
+      "line": 232,
+      "kernel_symbol": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1",
+      "triton_function_symbol": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1"
+    },
+    {
+      "code_unit": 0,
+      "line": 236,
+      "kernel_symbol": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2",
+      "triton_function_symbol": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2"
+    }
+  ],
+  "generated_code_kinds": [
+    ".py"
+  ],
+  "inductor_triton_kernel_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_triton_00.py",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_triton_01.py",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_triton_02.py"
+  ],
+  "inductor_triton_kernel_count": 3,
+  "inductor_ttir_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_000_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_001_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_002_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_003_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_004_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_005_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir"
+  ],
+  "inductor_ttir_kernel_count": 6,
+  "inductor_wrapper_referenced_ttir_artifacts": [
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_000_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_001_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_002_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_003_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_004_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+    "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_005_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir"
+  ],
+  "inductor_wrapper_referenced_ttir_kernel_count": 6,
+  "inductor_unassociated_ttir_artifacts": [],
+  "inductor_ttir_launch_associations": [
+    {
+      "ttir_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_000_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+      "ttir_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1"
+      ],
+      "matched_launch_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1"
+      ]
+    },
+    {
+      "ttir_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_001_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+      "ttir_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1"
+      ],
+      "matched_launch_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1"
+      ]
+    },
+    {
+      "ttir_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_002_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+      "ttir_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0"
+      ],
+      "matched_launch_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0"
+      ]
+    },
+    {
+      "ttir_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_003_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+      "ttir_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0"
+      ],
+      "matched_launch_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0"
+      ]
+    },
+    {
+      "ttir_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_004_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+      "ttir_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2"
+      ],
+      "matched_launch_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2"
+      ]
+    },
+    {
+      "ttir_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/inductor_ttir/kernel_005_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+      "ttir_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2"
+      ],
+      "matched_launch_symbols": [
+        "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2"
+      ]
+    }
+  ],
+  "inductor_kernel_launch_symbols": [
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2"
+  ],
+  "inductor_ttir_origin": "triton_compiler_dump",
+  "numerical_match": true,
+  "inductor_error": null,
+  "code_capture_error": null,
+  "hgraph_origin": "torch.export",
+  "hgraph_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/workload.hgir",
+  "hgraph_json_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/workload.json",
+  "hgraph_op_count": 25,
+  "hgraph_error": null,
+  "workload_analysis": {
+    "pattern": "attention",
+    "operation_counts": {
+      "contiguous": 1,
+      "linear": 2,
+      "permute": 1,
+      "reshape": 1,
+      "scaled_dot_product_attention": 1,
+      "select": 3,
+      "squeeze": 1,
+      "transpose": 6,
+      "unflatten": 1,
+      "unsqueeze": 1,
+      "view": 7
+    },
+    "has_scaled_dot_product_attention": true,
+    "has_residual_add": false,
+    "has_normalization": false,
+    "has_gelu": false,
+    "input_shapes": {
+      "p_attention_in_proj_weight": [
+        96,
+        32
+      ],
+      "p_attention_in_proj_bias": [
+        96
+      ],
+      "p_attention_out_proj_weight": [
+        32,
+        32
+      ],
+      "p_attention_out_proj_bias": [
+        32
+      ],
+      "x": [
+        1,
+        32,
+        32
+      ]
+    },
+    "output_shapes": {
+      "transpose_5": [
+        1,
+        32,
+        32
+      ]
+    }
+  },
+  "atlas_virtual_ops_emitted": false,
+  "attention_request": "nn.MultiheadAttention(need_weights=False) / SDPA",
+  "attention_implementation": "pytorch_ready_made_sdpa_flash_attention",
+  "correctness_reference": "PyTorch math SDPA with identical learned projections",
+  "correctness_check_passed": true,
+  "correctness_check_scope": "compiled output compared to independent PyTorch math-SDPA reference",
+  "attention_backend_constraint": "flash_attention_required",
+  "flash_attention_backend_compiled_under_constraint": true,
+  "flash_attention_backend_forced_and_run_succeeded": true,
+  "attention_backend_evidence": [
+    "# Topologically Sorted Source Nodes: [multi_head_attention_forward], Original ATen: [aten._unsafe_view, aten.view, aten.unsqueeze, aten.transpose, aten.squeeze, aten.clone, aten.select, aten._scaled_dot_product_flash_attention]",
+    "#   multi_head_attention_forward => _scaled_dot_product_flash_attention, clone, permute_2, permute_3, permute_4, permute_5, select, select_1, select_2, squeeze, unsqueeze, view_1, view_2, view_6, view_7, view_8",
+    "#   %_scaled_dot_product_flash_attention : [num_users=1] = call_function[target=torch.ops.aten._scaled_dot_product_flash_attention.default](args = (%view_6, %view_7, %view_8), kwargs = {scale: 0.17677669529663687})",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0 = async_compile.triton('triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0', '''",
+    "inductor_meta={'grid_type': 'Grid1D', 'kernel_name': 'triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0', 'mutated_arg_names': [], 'optimize_mem': True, 'no_x_dim': False, 'atomic_add_found': False, 'num_load': 1, 'num_store': 1, 'num_reduction': 0, 'autotune_hints': (), 'tiling_scores': {'x': 6144}, 'backend_hash': '99112F46E34FFE0C7B9EA02CA7CCE3EA132FFF264769496D789923144AFED6EF', 'assert_indirect_indexing': True, 'autotune_local_cache': True, 'autotune_pointwise': True, 'autotune_remote_cache': None, 'force_disable_caches': False, 'dynamic_scale_rblock': True, 'incremental_autotune': False, 'max_autotune': False, 'max_autotune_pointwise': False, 'min_split_scan_rblock': 256, 'spill_threshold': 16, 'store_cubin': False, 'deterministic': False, 'batch_invariant': False, 'force_filter_reduction_configs': False, 'mix_order_reduction_allow_multi_stages': True, 'dynamic_disable_pipelining': True, 'are_deterministic_algorithms_enabled': False},",
+    "def triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0(in_ptr0, out_ptr0, xnumel, XBLOCK : tl.constexpr):",
+    "# Topologically Sorted Source Nodes: [multi_head_attention_forward], Original ATen: [aten._unsafe_view, aten.view, aten.unsqueeze, aten.transpose, aten.squeeze, aten.clone, aten.select, aten._scaled_dot_product_flash_attention]",
+    "#   multi_head_attention_forward => _scaled_dot_product_flash_attention, clone, permute_2, permute_3, permute_4, permute_5, select, select_1, select_2, squeeze, unsqueeze, view_1, view_2, view_6, view_7, view_8",
+    "#   %_scaled_dot_product_flash_attention : [num_users=1] = call_function[target=torch.ops.aten._scaled_dot_product_flash_attention.default](args = (%view_6, %view_7, %view_8), kwargs = {scale: 0.17677669529663687})",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1 = async_compile.triton('triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1', '''",
+    "inductor_meta={'grid_type': 'Grid1D', 'kernel_name': 'triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1', 'mutated_arg_names': [], 'optimize_mem': True, 'no_x_dim': False, 'atomic_add_found': False, 'num_load': 1, 'num_store': 1, 'num_reduction': 0, 'autotune_hints': (), 'tiling_scores': {'x': 6144}, 'backend_hash': '99112F46E34FFE0C7B9EA02CA7CCE3EA132FFF264769496D789923144AFED6EF', 'assert_indirect_indexing': True, 'autotune_local_cache': True, 'autotune_pointwise': True, 'autotune_remote_cache': None, 'force_disable_caches': False, 'dynamic_scale_rblock': True, 'incremental_autotune': False, 'max_autotune': False, 'max_autotune_pointwise': False, 'min_split_scan_rblock': 256, 'spill_threshold': 16, 'store_cubin': False, 'deterministic': False, 'batch_invariant': False, 'force_filter_reduction_configs': False, 'mix_order_reduction_allow_multi_stages': True, 'dynamic_disable_pipelining': True, 'are_deterministic_algorithms_enabled': False},",
+    "def triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1(in_ptr0, out_ptr0, xnumel, XBLOCK : tl.constexpr):",
+    "# Topologically Sorted Source Nodes: [multi_head_attention_forward], Original ATen: [aten._unsafe_view, aten.view, aten.unsqueeze, aten.transpose, aten.squeeze, aten.clone, aten.select, aten._scaled_dot_product_flash_attention]",
+    "#   multi_head_attention_forward => _scaled_dot_product_flash_attention, clone, permute_2, permute_3, permute_4, permute_5, select, select_1, select_2, squeeze, unsqueeze, view_1, view_2, view_6, view_7, view_8",
+    "#   %_scaled_dot_product_flash_attention : [num_users=1] = call_function[target=torch.ops.aten._scaled_dot_product_flash_attention.default](args = (%view_6, %view_7, %view_8), kwargs = {scale: 0.17677669529663687})",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2 = async_compile.triton('triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2', '''",
+    "inductor_meta={'grid_type': 'Grid1D', 'kernel_name': 'triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2', 'mutated_arg_names': [], 'optimize_mem': True, 'no_x_dim': False, 'atomic_add_found': False, 'num_load': 1, 'num_store': 1, 'num_reduction': 0, 'autotune_hints': (), 'tiling_scores': {'x': 6144}, 'backend_hash': '99112F46E34FFE0C7B9EA02CA7CCE3EA132FFF264769496D789923144AFED6EF', 'assert_indirect_indexing': True, 'autotune_local_cache': True, 'autotune_pointwise': True, 'autotune_remote_cache': None, 'force_disable_caches': False, 'dynamic_scale_rblock': True, 'incremental_autotune': False, 'max_autotune': False, 'max_autotune_pointwise': False, 'min_split_scan_rblock': 256, 'spill_threshold': 16, 'store_cubin': False, 'deterministic': False, 'batch_invariant': False, 'force_filter_reduction_configs': False, 'mix_order_reduction_allow_multi_stages': True, 'dynamic_disable_pipelining': True, 'are_deterministic_algorithms_enabled': False},",
+    "def triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2(in_ptr0, out_ptr0, xnumel, XBLOCK : tl.constexpr):",
+    "# Topologically Sorted Source Nodes: [multi_head_attention_forward], Original ATen: [aten._unsafe_view, aten.view, aten.unsqueeze, aten.transpose, aten.squeeze, aten.clone, aten.select, aten._scaled_dot_product_flash_attention]",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.run(buf0, buf1, 1024, stream=raw_stream0)",
+    "# Topologically Sorted Source Nodes: [multi_head_attention_forward], Original ATen: [aten._unsafe_view, aten.view, aten.unsqueeze, aten.transpose, aten.squeeze, aten.clone, aten.select, aten._scaled_dot_product_flash_attention]",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.run(buf0, buf2, 1024, stream=raw_stream0)",
+    "# Topologically Sorted Source Nodes: [multi_head_attention_forward], Original ATen: [aten._unsafe_view, aten.view, aten.unsqueeze, aten.transpose, aten.squeeze, aten.clone, aten.select, aten._scaled_dot_product_flash_attention]",
+    "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.run(buf0, buf3, 1024, stream=raw_stream0)",
+    "# Topologically Sorted Source Nodes: [multi_head_attention_forward], Original ATen: [aten._unsafe_view, aten.view, aten.unsqueeze, aten.transpose, aten.squeeze, aten.clone, aten.select, aten._scaled_dot_product_flash_attention]",
+    "buf4 = torch.ops.aten._scaled_dot_product_flash_attention.default(buf1, buf2, buf3, scale=0.17677669529663687)",
+    "assert_tensor_metadata(buf5, (1, 1, 32, 32), (1024, 1024, 32, 1), torch.float16, 'torch.ops.aten._scaled_dot_product_flash_attention.default')",
+    "assert_alignment(buf5, 16, 'torch.ops.aten._scaled_dot_product_flash_attention.default')"
+  ],
+  "flash_attention_kernel_detected_in_generated_code": true,
+  "flash_attention_kernel_detected_in_ttir": true,
+  "report_artifact": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/capture.json",
+  "atlas_mapping_status": "no_supported_kernels",
+  "atlas_mapping_report": "/home/grammy/blast/triton-shit/ttir2linalg/out/run/attention_flash/atlas/mapping.json",
+  "atlas_mapped_kernel_count": 0
+}

@@ -10,7 +10,9 @@ from kernels.flash_attention import flash_attention_kernel
 
 
 @triton_op("ttir2linalg::custom_flash_attention", mutates_args={})
-def _custom_flash_attention(q, k, v, heads: int):
+def _custom_flash_attention(
+    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, heads: int,
+) -> torch.Tensor:
     batch, _, seq, head_dim = q.shape
     result = torch.empty_like(q)
     block_m, block_n = 16, 32

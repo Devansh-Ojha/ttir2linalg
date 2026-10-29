@@ -2,6 +2,7 @@
 # file on BWRC; its wheel supplies the matching Triton compiler dependency.
 # The lower bound includes AOTInductor and torch.library.triton_op support.
 torch>=2.14
+numpy>=1.26
 
 # Keep xdsl on the API version used by this repository until the MLIR frontend
 # has been checked against a newer release.
