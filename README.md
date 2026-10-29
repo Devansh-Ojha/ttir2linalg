@@ -30,7 +30,8 @@ only the Inductor-generated TTIR files:
 
 ```bash
 mkdir -p out/inductor
-for model in linear_relu mlp attention attention_mlp transformer_block; do
+for model in linear_relu mlp attention_flash attention_custom_flash \
+             attention_mlp transformer_block; do
   PYTHONPATH=. python -m compiler.inductor_capture \
     --model "$model" \
     --out-dir "out/inductor/$model" \
@@ -43,13 +44,26 @@ FlashAttention compile status, and Atlas mapping status. `atlas/mapping.json`
 lists each wrapper-referenced TTIR kernel as mapped or unsupported with analyzer
 diagnostics. The existing Atlas recognizers are deliberately bounded; a
 successful Inductor compile does not imply every kernel is already supported.
-For a real output comparison on a GPU, rerun a workload with `--mode run`.
+`attention_flash` uses PyTorch's ready-made SDPA FlashAttention backend; it may
+emit a native CUDA kernel instead of Triton, which the report will show.
+`attention_custom_flash` uses `kernels/flash_attention.py`, our own tiled
+online-softmax Triton kernel. This is the path that explicitly exposes our
+Triton source and its compiler TTIR. The current Atlas attention recognizer is
+limited to a different small TTIR pattern, so custom FlashAttention may appear
+as unsupported in `mapping.json` until that recognizer is extended.
+
+For numerical correctness, run on a GPU with `--mode run`: the custom Triton
+result and the ready-made FlashAttention result are compared to an independent
+PyTorch math-SDPA reference with identical learned projections. A successful
+fake-tensor AOT compile checks code generation only; it cannot establish
+numerical correctness because it does not execute the kernels.
 
 The workload names are:
 
 - `linear_relu`: one projection followed by ReLU
 - `mlp`: FC1 + ReLU + FC2
-- `attention`: self-attention, requesting SDPA and requiring FlashAttention
+- `attention_flash`: self-attention using PyTorch's ready-made FlashAttention
+- `attention_custom_flash`: self-attention using the repository's Triton kernel
 - `attention_mlp`: attention followed by a feed-forward MLP
 - `transformer_block`: attention, residual connections, normalization, and MLP
 

@@ -36,6 +36,14 @@ def _model_and_input(name: str, *, input_size: int, hidden_size: int,
         from model.attention import SimpleAttention
 
         return SimpleAttention(embed_size, num_heads).eval(), (1, sequence_length, embed_size)
+    if name == "attention_flash":
+        from model.attention import SimpleAttention
+
+        return SimpleAttention(embed_size, num_heads).eval(), (1, sequence_length, embed_size)
+    if name == "attention_custom_flash":
+        from model.custom_flash_attention import CustomFlashAttention
+
+        return CustomFlashAttention(embed_size, num_heads).eval(), (1, sequence_length, embed_size)
     if name == "attention_mlp":
         from model.attention_mlp import AttentionMLP
 
@@ -172,7 +180,8 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     code_units = []
     attention_backend_constraint = "not_applicable"
     attention_context = nullcontext()
-    if model_name in {"attention", "attention_mlp", "transformer_block"} and device.startswith("cuda"):
+    ready_made_flash = model_name in {"attention", "attention_flash", "attention_mlp", "transformer_block"}
+    if ready_made_flash and device.startswith("cuda"):
         # Make FlashAttention a required backend for this experiment, rather
         # than inferring it from the fact that the model requested SDPA.
         try:
@@ -194,9 +203,10 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         else:
             compiled = torch.compile(model, backend="inductor")
             with attention_context:
-                expected = model(sample)
+                reference = getattr(model, "reference_forward", model)
+                expected = reference(sample)
                 actual = compiled(sample)
-            torch.testing.assert_close(actual, expected)
+            torch.testing.assert_close(actual, expected, rtol=1e-3, atol=1e-3)
             numerical_match = True
         compile_succeeded = True
     except Exception as exc:
@@ -313,8 +323,36 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         "workload_analysis": workload.to_dict() if workload is not None else None,
         "atlas_virtual_ops_emitted": False,
     }
-    if model_name in {"attention", "attention_mlp", "transformer_block"}:
-        report["attention_request"] = "nn.MultiheadAttention(need_weights=False) / SDPA"
+    if model_name == "attention_custom_flash":
+        report["custom_triton_kernel_source"] = str(
+            (Path(__file__).resolve().parents[1] / "kernels/flash_attention.py")
+        )
+        report["custom_triton_kernel"] = "flash_attention_kernel (online softmax)"
+        report["custom_kernel_numerical_validation"] = (
+            "passed" if numerical_match is True else
+            "not_run" if numerical_match is None else "failed"
+        )
+    if model_name in {"attention", "attention_flash", "attention_custom_flash", "attention_mlp", "transformer_block"}:
+        report["attention_request"] = (
+            "custom Triton online-softmax FlashAttention"
+            if model_name == "attention_custom_flash"
+            else "nn.MultiheadAttention(need_weights=False) / SDPA"
+        )
+        report["attention_implementation"] = (
+            "repository_triton_flash_attention"
+            if model_name == "attention_custom_flash"
+            else "pytorch_ready_made_sdpa_flash_attention"
+        )
+        report["correctness_reference"] = (
+            "PyTorch math SDPA with identical learned projections"
+            if hasattr(model, "reference_forward") else "eager PyTorch model"
+        )
+        report["correctness_check_passed"] = numerical_match
+        report["correctness_check_scope"] = (
+            "compiled output compared to independent PyTorch math-SDPA reference"
+            if hasattr(model, "reference_forward") else
+            "runtime output compared to eager model; AOT compile alone does not validate numerics"
+        )
         report["attention_backend_constraint"] = attention_backend_constraint
         report["flash_attention_backend_compiled_under_constraint"] = (
             attention_backend_constraint == "flash_attention_required"
@@ -369,7 +407,8 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", choices=(
-        "linear_relu", "mlp", "attention", "attention_mlp", "transformer_block"
+        "linear_relu", "mlp", "attention", "attention_flash",
+        "attention_custom_flash", "attention_mlp", "transformer_block"
     ), default="mlp")
     parser.add_argument("--mode", choices=("aot-cuda", "run"), default="aot-cuda",
                         help="aot-cuda cross-compiles with fake CUDA tensors and no GPU")

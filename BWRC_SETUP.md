@@ -57,7 +57,8 @@ Transformer block includes attention, residual paths, normalization, and an MLP.
 
 ```bash
 mkdir -p out
-for model in linear_relu mlp attention attention_mlp transformer_block; do
+for model in linear_relu mlp attention_flash attention_custom_flash \
+             attention_mlp transformer_block; do
   PYTHONPATH=. python -m compiler.inductor_capture \
     --model "$model" --out-dir "out/inductor/$model" --mode aot-cuda
 done
@@ -88,16 +89,22 @@ for path in sorted(Path("out/inductor").glob("*/capture.json")):
 PY
 ```
 
-For attention, AOT compilation restricts SDPA to the FlashAttention backend.
-Some PyTorch versions or cross-compile setups may still need device capability
-metadata to compile this path; failures are recorded explicitly. A single
+`attention_flash` forces PyTorch's ready-made FlashAttention SDPA backend;
+`attention_custom_flash` invokes the repository's tiled Triton online-softmax
+kernel through `torch.library.triton_op`. The latter is expected to expose a
+Triton source and TTIR file. PyTorch's built-in FlashAttention may instead
+emit a native CUDA kernel, which is recorded as such. Some PyTorch versions or
+cross-compile setups may still need device capability metadata to compile
+these paths; failures are recorded explicitly. The existing Atlas attention
+recognizer may report custom FlashAttention TTIR as unsupported. A single
 captured graph also does not mean one monolithic kernel: compare generated
 unit counts and inspect each artifact for fusion boundaries. Unsupported
 Inductor TTIR kernels remain in `mapping.json` with matcher diagnostics.
 
-To run the compiled model and compare it with eager PyTorch, request a GPU
-allocation and use `--mode run`. That validation requires an actual GPU; the
-default `aot-cuda` artifact-generation mode does not.
+For a numerical check, request a GPU allocation and use `--mode run`. Both
+FlashAttention implementations are compared with PyTorch math SDPA using the
+same learned projections. Fake-tensor `aot-cuda` verifies compilation and
+artifact capture only; it cannot verify output values.
 
 ## 3. Build Atlas-MLIR
 
