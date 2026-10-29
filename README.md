@@ -19,8 +19,10 @@ PyTorch model
 ## Setup
 
 Follow [BWRC_SETUP.md](BWRC_SETUP.md) to prepare PyTorch, Triton, and Atlas-MLIR.
-Use the PyTorch install selector to install a CUDA-enabled build even when
-cross-compiling on a machine without a GPU.
+Install the CUDA-enabled PyTorch build for the BWRC toolchain, then install
+the repository's Python dependencies with `python -m pip install -r
+requirements.txt`. See [RUN_PIPELINE.txt](RUN_PIPELINE.txt) for copy-paste
+capture and numerical-check commands.
 
 ## Capture and lower
 

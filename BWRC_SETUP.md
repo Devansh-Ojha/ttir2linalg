@@ -27,14 +27,14 @@ python -m pip install --upgrade pip
 Install a CUDA-enabled PyTorch wheel using the command selected by the official
 [PyTorch install selector](https://pytorch.org/get-started/locally/). A GPU is
 not required to install it or run the AOT cross-compile path.
-Check whether that environment already provides the compatible Triton package;
-install Triton only if it is missing, using a version compatible with that
-PyTorch release. Then install the graph/MLIR Python dependency:
+Then install the repository dependencies. `requirements.txt` leaves PyTorch
+current at or above the AOTInductor minimum and pins xdsl to the version used
+by this repository. The CUDA PyTorch wheel provides its compatible Triton
+compiler dependency.
 
 ```bash
-python -m pip install torch
-python -c 'import triton; print(triton.__version__)' || python -m pip install triton
-python -m pip install xdsl==0.65.0
+python -m pip install -r requirements.txt
+python -c 'import importlib.metadata as m, torch, triton; print("torch", torch.__version__, "CUDA build", torch.backends.cuda.is_built(), "GPU available", torch.cuda.is_available()); print("triton", triton.__version__, "xdsl", m.version("xdsl"))'
 ```
 
 Record the environment so results can be reproduced:

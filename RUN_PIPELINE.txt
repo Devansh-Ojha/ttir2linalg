@@ -1,0 +1,108 @@
+TTIR2LINALG: RUN THE FLASHATTENTION PIPELINE ON BWRC
+====================================================
+
+1. Clone and set up the environment
+
+    git clone git@github.com:Devansh-Ojha/ttir2linalg.git
+    cd ttir2linalg
+    module avail python cuda gcc cmake llvm
+    module load <BWRC Python module> <BWRC CUDA module>
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install --upgrade pip
+
+Install a CUDA-enabled PyTorch build using the official selector, choosing the
+CUDA version appropriate for BWRC:
+
+    https://pytorch.org/get-started/locally/
+
+Then install this repository's remaining pinned/declared dependencies:
+
+    python -m pip install -r requirements.txt
+
+The default AOT capture does not need a physical GPU allocation, but PyTorch
+must be built with CUDA and include a compatible Triton compiler. Check that:
+
+    python -c 'import torch, triton; print("torch", torch.__version__, "CUDA build", torch.backends.cuda.is_built(), "GPU available", torch.cuda.is_available()); print("triton", triton.__version__); assert torch.backends.cuda.is_built()'
+
+For AOT capture, "GPU available" may be False. That is expected.
+
+2. Capture both attention implementations (no GPU allocation required)
+
+    for model in attention_flash attention_custom_flash; do
+      PYTHONPATH=. python -m compiler.inductor_capture \
+        --model "$model" \
+        --mode aot-cuda \
+        --sequence-length 32 --embed-size 32 --num-heads 1 \
+        --out-dir "out/inductor/$model"
+    done
+
+attention_flash uses PyTorch's ready-made FlashAttention SDPA backend.
+attention_custom_flash uses this repository's Triton online-softmax kernel
+from kernels/flash_attention.py. The ready-made backend may emit a native CUDA
+kernel instead of Triton. The custom kernel is the experiment intended to
+produce a Triton TTIR artifact.
+
+3. Inspect what actually compiled and mapped
+
+    python - <<'PY'
+import json
+from pathlib import Path
+
+for model in ("attention_flash", "attention_custom_flash"):
+    root = Path("out/inductor") / model
+    report = json.loads((root / "capture.json").read_text())
+    print(f"\n{model}")
+    for key in (
+        "inductor_status", "compile_mode", "code_count",
+        "inductor_kernel_launch_site_count", "inductor_triton_kernel_count",
+        "inductor_ttir_kernel_count", "inductor_wrapper_referenced_ttir_kernel_count",
+        "atlas_mapping_status", "atlas_mapped_kernel_count",
+        "flash_attention_backend_compiled_under_constraint",
+        "custom_triton_kernel_source", "inductor_error", "code_capture_error",
+    ):
+        if key in report:
+            print(f"  {key}: {report[key]}")
+    print("  TTIR files:", *report.get("inductor_ttir_artifacts", []), sep="\n    ")
+    mapping = root / "atlas" / "mapping.json"
+    if mapping.exists():
+        data = json.loads(mapping.read_text())
+        for kernel in data["kernels"]:
+            print("  map:", kernel["status"], kernel["source_ttir"])
+            for attempt in kernel.get("attempts", []):
+                print("    ", attempt["pattern"], attempt["reason"])
+PY
+
+Successful AOT capture means Inductor compiled and artifacts were collected;
+it does not mean every TTIR kernel maps to Atlas. The current Atlas attention
+recognizer does not yet support the custom online-softmax TTIR shape, so expect
+that kernel to be listed as unsupported. Do not count that as a successful VOP
+lowering.
+
+4. Check numerical correctness (requires an actual GPU allocation)
+
+After requesting a GPU allocation, confirm PyTorch can see it:
+
+    python -c 'import torch; print(torch.cuda.is_available()); assert torch.cuda.is_available()'
+
+Then execute each workload and compare against the independent PyTorch
+math-SDPA reference:
+
+    for model in attention_flash attention_custom_flash; do
+      PYTHONPATH=. python -m compiler.inductor_capture \
+        --model "$model" \
+        --mode run \
+        --sequence-length 32 --embed-size 32 --num-heads 1 \
+        --out-dir "out/run/$model"
+    done
+
+Check capture.json for "numerical_match": true and
+"correctness_check_passed": true. AOT capture alone cannot establish numeric
+correctness because it never runs the generated kernels.
+
+5. What this pipeline does not prove yet
+
+The custom Triton kernel's TTIR is captured, but the current Atlas matcher
+does not lower its online-softmax loop to virtual ops. That requires extending
+the Atlas attention recognizer and validating the resulting virtual program
+against the intended Atlas numerical policy.
