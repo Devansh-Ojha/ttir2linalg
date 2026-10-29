@@ -1,16 +1,14 @@
-# PyTorch to Triton/TTIR and Atlas
+# PyTorch Inductor kernels to Atlas virtual ops
 
-The updated project objective is an end-to-end PyTorch Inductor-to-SE/Linalg-
-to-Atlas virtual-op path for MLP and Transformer workloads. The milestones,
-scope, and completion criteria are in [GOAL.md](GOAL.md). The commands below
-describe the current prototype paths; they do not yet form that complete
-Inductor-to-Atlas pipeline.
+The target path is **PyTorch model → real TorchInductor code and Triton TTIR
+dumps → TTIR pattern recognition → Atlas virtual ops**. See [GOAL.md](GOAL.md)
+for scope and current coverage.
 
-This project currently has separate prototype paths for model capture and
-handwritten Triton lowering:
+The main path uses Inductor's generated kernel artifacts. Handwritten Triton
+examples remain separate reference paths:
 
 ```text
-PyTorch model -> torch.compile graph capture -> Triton kernel source
+PyTorch model -> torch.compile(backend="inductor") -> generated code + TTIR -> Atlas virtual ops
 PyTorch model -> explicit Triton kernels -> Triton compiler -> verified TTIR
 ```
 
@@ -29,15 +27,17 @@ sequence, follow [BWRC_SETUP.md](BWRC_SETUP.md). The concise local setup below
 is suitable for a development machine and may need platform-specific package
 selection.
 
-Use Python 3.9+ and install the dependencies in the target environment:
+Use the Python/PyTorch/CUDA versions supported by the target machine (see
+[BWRC_SETUP.md](BWRC_SETUP.md)):
 
 ```bash
 python -m pip install torch
-python -m pip install triton==3.4.0
+python -m pip install triton xdsl==0.65.0
 ```
 
-Triton is required for genuine `.ttir` generation. CUDA execution is not
-required; the compiler target is used only to produce compiler artifacts.
+The Inductor-to-Atlas path needs a CUDA run when the installed Inductor backend
+emits Triton kernels. CPU Inductor output is captured, but it cannot enter the
+current TTIR-based mapper.
 
 ## Run the Triton-source stage
 
@@ -95,23 +95,21 @@ PYTHONPATH=. python -m compiler.inductor_capture \
   --out-dir out/inductor/transformer_block
 ```
 
-The command runs `torch.compile(..., backend="inductor")`, checks the result
-against eager PyTorch, and writes Inductor-generated code, an exported workload
-graph, any Triton kernels embedded in that code, and `capture.json`. The
-generated code depends on the selected backend
-(typically C++ on CPU and potentially Triton on CUDA). It does not fabricate
-TTIR or Atlas operations. This capture artifact is the first explicit bridge
-in the larger objective; lowering the captured graph/code to the Atlas
-frontend remains under development. The attention model requests SDPA by
-disabling attention weight output; `capture.json` records matching generated
-code lines as backend evidence, but the actual artifact must be inspected to
-confirm which fused attention kernel the installed backend selected.
-If Inductor fails to compile on the host, the command still writes the exported
-graph and a report containing the failure reason; it records no generated code
-or successful numerical comparison in that case.
+The command runs `torch.compile(..., backend="inductor")`, checks numerical
+results against eager PyTorch, and writes generated code, graph context, and a
+capture report. Before importing PyTorch, it enables Triton's compiler dump so
+the exact Inductor-emitted `.ttir` kernels are saved under
+`inductor_ttir/`. It then automatically runs `compiler.inductor_to_atlas` on
+those files. Supported kernels produce per-kernel virtual MLIR under `atlas/`;
+unsupported kernels and matcher diagnostics go to `atlas/mapping.json`. The
+mapper does not substitute the separate `torch.export` graph or handwritten
+Triton kernels. For attention workloads on CUDA, the capture requires the
+FlashAttention SDPA backend; eligibility/compilation failures appear in
+`capture.json`.
 
-The serialized HGraph for a supported dense workload can be mapped to the
-existing Atlas virtual dialect with an explicit precision policy:
+There is also an older graph-semantics experiment that maps a serialized
+`torch.export` HGraph directly to Atlas. It is not the Inductor-kernel pipeline.
+To run that separate experiment:
 
 ```bash
 PYTHONPATH=. python -m compiler.hgraph_to_atlas \
@@ -120,13 +118,8 @@ PYTHONPATH=. python -m compiler.hgraph_to_atlas \
   --out out/atlas/mlp_from_hgraph.virtual.mlir
 ```
 
-This frontend currently admits the one-layer Linear+ReLU and two-layer MLP
-graphs. Its input is the separately exported `torch.export` HGraph; generated
-Inductor kernels are not yet associated with or consumed by this mapping. The
-caller must stage 32×32 FP8 activation/weight tiles and BF16 bias tiles.
-If Inductor fails to compile on the host, the command still writes the exported
-graph and a report containing the failure reason; it records no generated code
-or successful numerical comparison in that case.
+This frontend admits only one- and two-layer dense graphs and is not evidence
+that the generated Inductor kernels were lowered.
 
 ## Run the Triton-to-TTIR stage
 

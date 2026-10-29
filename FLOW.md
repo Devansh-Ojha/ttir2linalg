@@ -1,184 +1,73 @@
-# Current compiler flow
+# Current PyTorch Inductor → Atlas flow
 
-This document follows the checked-in files from source model or kernel to
-their current outputs and explains how the new Atlas slice fits alongside
-the existing paths.
-
-## Repository areas
-
-| Path | Role |
-| --- | --- |
-| `model/` | Small PyTorch example models used by the pipeline. |
-| `compiler/inductor_capture.py` | Runs the actual Inductor backend and saves generated code, an exported HGraph, and capture metadata. |
-| `kernels/` | Explicit Triton kernels used for source capture and TTIR compilation. |
-| `mlp_pipeline.py` | Top-level driver for model export, Triton source/TTIR capture, and HGraph output. |
-| `compiler/ttir_model.py` | Target-neutral data classes used by the parsed TTIR representation. |
-| `compiler/ttir_reader.py` | Uses Triton's `libtriton` to parse/verify TTIR and expose functions, blocks, operations, values, types, and attributes. |
-| `compiler/hgir.py` | Small hardware-agnostic graph representation and verifier. |
-| `compiler/hgir_from_fx.py` | Converts an exported PyTorch FX graph into HGraph. |
-| `compiler/hgraph_analysis.py` | Classifies HGraph MLP, attention, and Transformer workload structure without target mapping. |
-| `compiler/hgraph_atlas_mapping.py`, `compiler/hgraph_to_atlas.py` | Maps serialized `torch.export` dense HGraphs to Atlas virtual SSA under an explicit FP8/BF16 policy. |
-| `compiler/hgir_from_ttir.py` | Converts parsed TTIR into HGraph for inspection and downstream experiments. |
-| `compiler/linalg_lowering.py`, `compiler/real_mlir.py` | Existing TTIR-to-Linalg/MLIR prototype path. |
-| `compiler/triton_analysis.py` | Recognizes bounded linear + ReLU, two-layer MLP, attention, and matmul + ReLU plans without Atlas-specific emission. |
-| `compiler/target_mapping.py` | Defines the target-neutral workload mapper interface. |
-| `compiler/atlas_mapping.py` | Maps those plans to existing Atlas virtual SSA and applies Atlas tile ABI and precision policies. |
-| `compiler/ttir_to_atlas.py` | CLI joining TTIR parsing, pattern analysis, and selected target mapping. |
-| `examples/ttir_to_atlas/` | Atlas conversion scope and handoff commands. |
-| `examples/triton_cpu_mlp_export/` | Separate Triton CPU LLVM IR export experiment. |
-| `tests/` | Unit and pipeline checks, including the focused analyzer/mapper tests. |
-
-## Model and FX inspection path
+The main path starts from a PyTorch model and translates artifacts produced by
+the actual Inductor/Triton compiler. The source `torch.export` HGraph is saved
+for context; it does not provide operations to the Inductor-to-Atlas mapper.
 
 ```text
-model/*.py
-    │
-    ▼
-mlp_pipeline.py
-    │ torch.export / optional torch.compile graph capture
-    ▼
-compiler/hgir_from_fx.py ──► compiler/hgir.py ──► .hgir
+model/*.py + sample tensors
+       │
+       ▼
+torch.compile(..., backend="inductor")
+       ├── generated wrapper / Triton source ──► inductor_*.py/.cpp
+       ├── actual Triton compilation ──────────► inductor_ttir/*.ttir
+       ├── torch.export (context only) ─────────► workload.hgir/.json
+       └── eager comparison + evidence ─────────► capture.json
+                                                    │
+                                                    ▼
+                                    compiler.inductor_to_atlas
+                                      ├── parse exact dumped TTIR
+                                      ├── strict supported-pattern analysis
+                                      ├── per-kernel Atlas mapping
+                                      └── mapping.json (mapped + unsupported)
+                                                    │
+                                                    ▼
+                                      Atlas-MLIR virtual verification
+                                      scheduling / allocation / lowering
 ```
 
-This path describes the exported PyTorch graph in the project's neutral HGraph
-format. It does not preserve or create an Atlas virtual kernel today.
+`compiler/inductor_capture.py` sets `TRITON_KERNEL_DUMP` and the dump directory
+before importing PyTorch, so TTIR comes from Triton compiling Inductor's own
+kernels. It never recompiles the project's handwritten Triton reference
+kernels for this route. CUDA is needed for the Triton kernel path. For attention
+workloads the capture restricts SDPA to FlashAttention on CUDA; if the shape,
+device, or installed stack cannot select it, the capture reports the failure.
 
-## Actual Inductor capture path
+`compiler/inductor_to_atlas.py` reads the TTIR artifact list in `capture.json`
+and attempts the existing strict analyzers for linear+ReLU, attention,
+matmul+ReLU, or the recognized two-layer MLP. An Atlas file is written only
+when an exact TTIR artifact matches a supported pattern. Every other kernel is
+reported with diagnostics; no graph-side or handwritten-kernel fallback is
+used. Atlas files state an explicit numerical policy and caller-staged tile
+ABI, and represent compute operations rather than performing runtime tensor
+movement.
 
-```text
-model/linear_relu.py, model/mlp.py, model/attention.py,
-model/transformer_block.py
-    │
-    ▼
-compiler/inductor_capture.py
-    ├── torch.compile(..., backend="inductor") ──► backend-generated code
-    │                                               └► embedded Triton sources (if any)
-    ├── eager comparison                         ──► numerical check
-    └── torch.export + hgir_from_fx              ──► workload.hgir
-                                                     capture.json
-```
+## Workloads
 
-This is a genuine Inductor invocation. The emitted code is backend-dependent:
-CPU commonly emits C++, while CUDA may emit Triton kernels. The graph artifact
-is currently exported independently from Inductor's generated code, and this
-new path is not yet connected to TTIR, Linalg, SE-level IR, or Atlas mapping.
-Attention uses `need_weights=False` to request SDPA; the report's source matches
-are evidence to inspect and do not by themselves prove that FlashAttention
-was selected.
+| Model flag | Model | Current expectation |
+| --- | --- | --- |
+| `linear_relu` | One projection + ReLU | First Inductor kernel matching target. |
+| `mlp` | FC1 + ReLU + FC2 | Kernels matched independently; complete coverage depends on emitted TTIR. |
+| `attention` | Self-attention using SDPA | FlashAttention is required on CUDA; current Atlas attention matcher is bounded and may report unsupported. |
+| `attention_mlp` | Attention followed by MLP | Captures generated kernels and reports per-kernel Atlas coverage. |
+| `transformer_block` | Attention, residual, normalization, MLP | Same; monolithic fusion is measured, not assumed. |
 
-The Transformer target is to fuse attention and feed-forward work into one
-monolithic launch where the selected backend permits it, while counting actual
-generated kernels separately from FX graph regions. A single graph is not
-evidence of a single generated kernel.
+Inductor may emit C++ or external library calls instead of Triton for an
+operation. Those are retained as real capture artifacts but do not enter the
+TTIR mapper. The capture report distinguishes code units from Triton kernel
+count and TTIR count. One FX graph does not imply one device kernel.
 
-There is now a separate dense HGraph lowering path:
+## Important independent experiments
 
-```text
-torch.export HGraph → workload.json → hgraph_to_atlas.py → Atlas virtual SSA
-```
+`torch.export → HGIR → hgraph_to_atlas.py` is a graph-semantics prototype for
+small dense MLPs. It does not consume Inductor kernel output. Similarly,
+`kernels/*.py → triton_capture.py` is a handwritten Triton reference path, and
+`ttir_to_linalg.py` is an older Linalg experiment. Neither is inserted into the
+main flow above.
 
-It handles the biased single-layer Linear+ReLU and two-layer MLP patterns with
-an explicit Atlas precision policy. It does not consume the Inductor generated
-code; Transformer/SDPA HGraph mapping and the SE-level boundary are still open.
+## Atlas backend ownership
 
-## Triton kernel to TTIR path
-
-```text
-kernels/*.py (@triton.jit)
-    │
-    ├── source capture ──► mlp_pipeline.py --compile-triton-source
-    │                       └──► *-triton/*.py
-    │
-    └── Triton compiler ──► compiler/triton_capture.py
-                             └──► *-ttir/*.ttir
-                                  │
-                                  ├── compiler/ttir_reader.py parses and verifies
-                                  ├── compiler/hgir_from_ttir.py ──► .hgir
-                                  └── compiler/linalg_lowering.py / real_mlir.py
-                                      ──► Linalg/MLIR prototype output
-```
-
-The checked-in single-layer MLP and attention TTIR use small FP32 reductions;
-their Atlas mappings explicitly stage padded FP8/BF16 tiles under target
-numerical policies. The two-layer FP8 MLP sample has its own strict analyzer.
-
-## TTIR to Atlas virtual SSA path
-
-```text
-matching *.ttir
-    │
-    ▼
-compiler/ttir_to_atlas.py
-    │
-    ├── compiler/ttir_reader.py
-    │     Triton's libtriton parser creates TFunc / TOp / TValue / TType
-    │     instances defined in compiler/ttir_model.py
-    │
-    ├── compiler/triton_analysis.py
-    │     recognizes linear-ReLU, two-layer MLP, attention, or matmul-ReLU
-    │     and returns a target-neutral workload plan
-    │
-    └── compiler/target_mapping.py → AtlasTargetMapper
-          selects the Atlas virtual-op mapping and explicit precision policy
-          emits existing Atlas operations; no allocation or instruction
-          emission is implemented in this repository
-                    │
-                    ▼
-             *.virtual.mlir
-                    │
-                    ▼
-Atlas-MLIR/tools/lower_atlas_program.py
-    │
-    ├── Atlas virtual verification and scheduling
-    ├── allocation and machine lowering
-    ├── timing pass
-    └── atlas-emit program artifacts
-```
-
-The converter owns the semantic recognition and Atlas virtual operation
-construction. Atlas-MLIR owns allocation and backend instruction emission. The
-current converter assigns runtime input slot indexes and emits aligned DRAM
-bases; it does not copy a Triton tensor from its original address into those
-slots.
-
-## Atlas conversion commands
-
-From this repository, with Triton and its `libtriton` Python bindings
-available, select a workload pattern and explicit precision policy:
-
-```bash
-PYTHONPATH=. python -m compiler.ttir_to_atlas \
-  mlp-ttir-test/kernel_0_fc1_relu.ttir --pattern linear-relu \
-  --numerical-policy atlas-fp8-linear-v1 \
-  --out out/atlas/mlp.virtual.mlir
-
-PYTHONPATH=. python -m compiler.ttir_to_atlas \
-  attention-ttir/kernel_0_attention.ttir --pattern attention \
-  --numerical-policy atlas-fp8-attention-v1 \
-  --out out/atlas/attention.virtual.mlir
-```
-
-Then, from an Atlas-MLIR checkout with its tools built:
-
-```bash
-python /path/to/atlas-mlir/tools/lower_atlas_program.py \
-  out/atlas/matmul_relu.virtual.mlir \
-  --atlas-bin-dir /path/to/atlas-mlir/build/bin \
-  --output-dir out/atlas/matmul_relu.lowered
-```
-
-The converter's accepted input pattern and numerical precision caveat are
-described in [examples/ttir_to_atlas/README.md](examples/ttir_to_atlas/README.md).
-
-## Separate Triton CPU export experiment
-
-`examples/triton_cpu_mlp_export/` is independent of the Atlas path:
-
-```text
-examples/triton_cpu_mlp_export/mlp_kernel.py
-    └── @triton.jit kernel
-         └── export_llvm_ir.py + Triton CPU backend ──► LLVM IR text
-```
-
-It does not use Atlas virtual operations, `compiler/atlas_mapping.py`, or the
-Atlas-MLIR lowering pipeline.
+This repository recognizes supported TTIR semantics and emits Atlas virtual
+SSA programs. The Atlas-MLIR checkout owns virtual-op verification, scheduling,
+allocation, and machine lowering. A generated virtual file is not executable
+until the caller stages the tensor tiles required by its explicit ABI.

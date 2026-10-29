@@ -62,9 +62,10 @@ for model in linear_relu mlp attention attention_mlp transformer_block; do
 done
 ```
 
-Each directory contains `capture.json`, `workload.hgir`, `workload.json`, and
-Inductor-generated source files when compilation succeeds. Inspect the real
-kernel count, backend evidence, and errors:
+Each directory contains `capture.json`, `workload.hgir`, `workload.json`,
+Inductor-generated source, and actual Triton TTIR dumps when those kernels are
+emitted. The capture automatically runs the strict TTIR-to-Atlas mapper; inspect
+its per-kernel results and any unsupported operations:
 
 ```bash
 python - <<'PY'
@@ -74,30 +75,24 @@ for path in sorted(Path("out/inductor").glob("*/capture.json")):
     report = json.loads(path.read_text())
     print(path.parent.name, report["inductor_status"],
           "generated units:", report["code_count"],
+          "kernel launches:", report["inductor_kernel_launch_count"],
           "Triton kernels:", report["inductor_triton_kernel_count"],
-          "FlashAttention evidence:", report.get("flash_attention_kernel_detected_in_generated_code"))
+          "TTIR kernels:", report["inductor_ttir_kernel_count"],
+          "launched TTIR kernels:", report["inductor_launched_ttir_kernel_count"],
+          "Atlas-mapped:", report.get("atlas_mapped_kernel_count"),
+          "FlashAttention forced + successful:", report.get("flash_attention_backend_forced_and_run_succeeded"),
+          "single launch:", report.get("one_kernel_fusion_observed"))
     if report.get("inductor_error"):
         print("  error:", report["inductor_error"])
 PY
 ```
 
-SDPA requests fused attention where supported; it does not guarantee a
-FlashAttention kernel. The generated code and report are the evidence. A
-single captured graph also does not mean one monolithic kernel: compare the
-generated unit count and inspect each artifact to see fusion boundaries.
-
-The current HGraph-to-Atlas bridge supports only the dense MLP patterns:
-
-```bash
-PYTHONPATH=. python -m compiler.hgraph_to_atlas \
-  out/inductor/mlp/workload.json \
-  --numerical-policy atlas-fp8-pytorch-dense-v1 \
-  --out out/atlas/mlp.virtual.mlir
-```
-
-This maps exported graph semantics, not Inductor-generated kernels. The
-attention/Transformer, Inductor-kernel-to-TTIR, and SE-level bridges remain
-implementation work.
+On CUDA, capture restricts SDPA to the FlashAttention backend. If the device
+or shape is ineligible, the report records the failure instead of silently
+claiming a fallback is FlashAttention. A single captured graph also does not
+mean one monolithic kernel: compare generated unit counts and inspect each
+artifact for fusion boundaries. Unsupported Inductor TTIR kernels remain in
+`mapping.json` with matcher diagnostics.
 
 ## 3. Build Atlas-MLIR
 
@@ -118,12 +113,12 @@ Use Atlas-MLIR's `atlas-opt` to verify the emitted virtual program and its
 machine-lowering flow:
 
 ```bash
+ATLAS_VIRTUAL="$(find out/inductor/mlp/atlas -name '*.virtual.mlir' -print -quit)"
 python /path/to/atlas-mlir/tools/lower_atlas_program.py \
-  out/atlas/mlp.virtual.mlir \
+  "$ATLAS_VIRTUAL" \
   --atlas-bin-dir /path/to/atlas-mlir/build/bin \
   --output-dir out/atlas/mlp.lowered
 ```
 
-See [FLOW.md](FLOW.md) for which compiler boundaries are implemented and
-which remain open. The acronym “SE” is not defined in this repository yet;
-the current Linalg prototype is not silently treated as that target IR.
+Use an `.virtual.mlir` path that is listed in `mapping.json`. See [FLOW.md](FLOW.md) for implemented
+boundaries and remaining coverage work.

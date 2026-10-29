@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import re
+import shutil
+import time
 from typing import Any
-
-import torch
+from contextlib import nullcontext
 
 from compiler.hgir_from_fx import from_exported_graph
 from compiler.hgraph_analysis import analyze_hgraph
@@ -52,11 +55,45 @@ def _artifact_suffix(code: str) -> str:
     return ".txt"
 
 
+def _launch_sites(code_units: list[str]) -> list[dict[str, Any]]:
+    """Collect generated wrapper call sites for Triton kernel launches."""
+    sites = []
+    for unit_index, code in enumerate(code_units):
+        for line_number, line in enumerate(code.splitlines(), 1):
+            match = re.search(r"\b([A-Za-z_]\w*)\.run\(", line)
+            if match:
+                sites.append({
+                    "code_unit": unit_index,
+                    "line": line_number,
+                    "kernel_symbol": match.group(1),
+                })
+    return sites
+
+
+def _ttir_function_symbols(path: Path) -> set[str]:
+    text = path.read_text()
+    return set(re.findall(
+        r"\btt\.func\s+(?:public\s+)?@([A-Za-z_][A-Za-z0-9_.$-]*)",
+        text,
+    ))
+
+
 def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-artifacts",
                      *, input_size: int = 4, hidden_size: int = 8,
-                     output_size: int = 8, sequence_length: int = 4,
-                     embed_size: int = 8, num_heads: int = 2) -> dict[str, Any]:
+                     output_size: int = 8, sequence_length: int = 128,
+                     embed_size: int = 64, num_heads: int = 2) -> dict[str, Any]:
     """Run the real Inductor backend and persist its emitted code and graph."""
+    output = Path(out_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    # Triton reads these settings during import. Set them before importing
+    # torch/model modules so Triton dumps TTIR while Inductor compiles its
+    # actual kernels. Force compilation so cache hits cannot hide the IR dump.
+    triton_dump_dir = output / "inductor_triton_dump" / ("run-%d" % time.time_ns())
+    os.environ["TRITON_KERNEL_DUMP"] = "1"
+    os.environ["TRITON_ALWAYS_COMPILE"] = "1"
+    os.environ["TRITON_DUMP_DIR"] = str(triton_dump_dir.resolve())
+    import torch
+
     model, shape = _model_and_input(
         model_name, input_size=input_size, hidden_size=hidden_size,
         output_size=output_size, sequence_length=sequence_length,
@@ -65,8 +102,6 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
     sample = torch.randn(*shape, device=device)
-    output = Path(out_dir)
-    output.mkdir(parents=True, exist_ok=True)
     exported = torch.export.export(model, (sample,))
     graph = from_exported_graph(exported)
     graph.name = model_name
@@ -81,10 +116,23 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     numerical_match = None
     compile_succeeded = False
     code_units = []
+    attention_backend_constraint = "not_applicable"
+    attention_context = nullcontext()
+    if model_name in {"attention", "attention_mlp", "transformer_block"} and device == "cuda":
+        # Make FlashAttention a required backend for this experiment, rather
+        # than inferring it from the fact that the model requested SDPA.
+        try:
+            from torch.nn.attention import SDPBackend, sdpa_kernel
+
+            attention_context = sdpa_kernel(SDPBackend.FLASH_ATTENTION)
+            attention_backend_constraint = "flash_attention_required"
+        except ImportError:
+            attention_backend_constraint = "flash_attention_constraint_unavailable"
     try:
-        expected = model(sample)
         compiled = torch.compile(model, backend="inductor")
-        actual = compiled(sample)
+        with attention_context:
+            expected = model(sample)
+            actual = compiled(sample)
         torch.testing.assert_close(actual, expected)
         numerical_match = True
         compile_succeeded = True
@@ -109,6 +157,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         path = output / ("inductor_%02d%s" % (index, suffix))
         path.write_text(code)
         code_paths.append(str(path))
+    launch_sites = _launch_sites(code_units)
 
     # The check above and source capture have distinct outcomes: successful
     # execution is useful evidence even if a PyTorch version lacks get_code.
@@ -125,6 +174,33 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         path.write_text(source)
         triton_paths.append(str(path))
 
+    # These are compiler-emitted TTIR dumps, not TTIR recompiled from our
+    # handwritten reference Triton kernels. Copy the dump artifacts into the
+    # capture directory so downstream translation has a stable input.
+    dumped_ttir_paths = []
+    launched_ttir_paths = []
+    unassociated_ttir_paths = []
+    ttir_launch_associations = []
+    launch_symbols = {site["kernel_symbol"] for site in launch_sites}
+    if triton_dump_dir.exists():
+        emitted_ttir_dir = output / "inductor_ttir"
+        for index, source_path in enumerate(sorted(triton_dump_dir.rglob("*.ttir"))):
+            target = emitted_ttir_dir / ("kernel_%03d_%s" % (index, source_path.name))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source_path, target)
+            dumped_ttir_paths.append(str(target))
+            ttir_symbols = sorted(_ttir_function_symbols(target))
+            matched_symbols = sorted(launch_symbols.intersection(ttir_symbols))
+            ttir_launch_associations.append({
+                "ttir_artifact": str(target),
+                "ttir_symbols": ttir_symbols,
+                "matched_launch_symbols": matched_symbols,
+            })
+            if matched_symbols:
+                launched_ttir_paths.append(str(target))
+            else:
+                unassociated_ttir_paths.append(str(target))
+
     report: dict[str, Any] = {
         "model": model_name,
         "torch_version": torch.__version__,
@@ -137,9 +213,19 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         "code_origin": "pytorch_inductor" if code_units else None,
         "code_artifacts": code_paths,
         "code_count": len(code_paths),
+        "inductor_kernel_launch_count": len(launch_sites),
+        "inductor_kernel_launch_sites": launch_sites,
         "generated_code_kinds": sorted({Path(p).suffix for p in code_paths}),
         "inductor_triton_kernel_artifacts": triton_paths,
         "inductor_triton_kernel_count": len(triton_paths),
+        "inductor_ttir_artifacts": dumped_ttir_paths,
+        "inductor_ttir_kernel_count": len(dumped_ttir_paths),
+        "inductor_launched_ttir_artifacts": launched_ttir_paths,
+        "inductor_launched_ttir_kernel_count": len(launched_ttir_paths),
+        "inductor_unassociated_ttir_artifacts": unassociated_ttir_paths,
+        "inductor_ttir_launch_associations": ttir_launch_associations,
+        "inductor_kernel_launch_symbols": sorted(launch_symbols),
+        "inductor_ttir_origin": "triton_compiler_dump" if dumped_ttir_paths else None,
         "numerical_match": numerical_match,
         "inductor_error": compile_error,
         "code_capture_error": code_capture_error,
@@ -152,6 +238,11 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     }
     if model_name in {"attention", "attention_mlp", "transformer_block"}:
         report["attention_request"] = "nn.MultiheadAttention(need_weights=False) / SDPA"
+        report["attention_backend_constraint"] = attention_backend_constraint
+        report["flash_attention_backend_forced_and_run_succeeded"] = (
+            attention_backend_constraint == "flash_attention_required"
+            and numerical_match is True
+        )
         report["attention_backend_evidence"] = [
             line.strip()
             for code in code_units
@@ -164,8 +255,32 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
             any(token in line.lower() for token in ("flash", "fmha"))
             for line in report["attention_backend_evidence"]
         )
+        report["flash_attention_kernel_detected_in_ttir"] = any(
+            any(token in (Path(path).name + Path(path).read_text()).lower()
+                for token in ("flash", "fmha", "fused_attention"))
+            for path in dumped_ttir_paths
+        )
+    if model_name in {"attention_mlp", "transformer_block"}:
+        report["one_kernel_fusion_observed"] = (
+            len(launch_sites) == 1 if device == "cuda" and code_units else None
+        )
     report_path = output / "capture.json"
     report["report_artifact"] = str(report_path)
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
+    try:
+        from compiler.inductor_to_atlas import map_capture
+
+        mapping = map_capture(output)
+        report["atlas_mapping_status"] = (
+            "completed_with_supported_kernels"
+            if mapping["mapped_kernel_count"] else "no_supported_kernels"
+        )
+        report["atlas_mapping_report"] = mapping["report_artifact"]
+        report["atlas_virtual_ops_emitted"] = mapping["mapped_kernel_count"] > 0
+        report["atlas_mapped_kernel_count"] = mapping["mapped_kernel_count"]
+    except Exception as exc:
+        report["atlas_mapping_status"] = "not_available"
+        report["atlas_mapping_error"] = "%s: %s" % (type(exc).__name__, exc)
     report_path.write_text(json.dumps(report, indent=2) + "\n")
     return report
 
@@ -179,8 +294,8 @@ def main() -> None:
     parser.add_argument("--input-size", type=int, default=4)
     parser.add_argument("--hidden-size", type=int, default=8)
     parser.add_argument("--output-size", type=int, default=8)
-    parser.add_argument("--sequence-length", type=int, default=4)
-    parser.add_argument("--embed-size", type=int, default=8)
+    parser.add_argument("--sequence-length", type=int, default=128)
+    parser.add_argument("--embed-size", type=int, default=64)
     parser.add_argument("--num-heads", type=int, default=2)
     args = parser.parse_args()
     print(json.dumps(capture_inductor(
