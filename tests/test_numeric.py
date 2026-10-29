@@ -1,6 +1,6 @@
 """Numerical test: TTIR -> Linalg (JIT-executed) vs a PyTorch/NumPy reference.
 
-Run:  PYTHONPATH=. python tests/test_numeric.py [kernel.ttir]
+Run:  PYTHONPATH=. python tests/test_numeric.py [path/to/kernel.ttir]
 Needs TTIR2LINALG_MLIR_PYTHON (python with the `mlir` package). Without it the
 test reports SKIPPED (exit 2) -- it never reports PASS without actually running.
 """
@@ -46,7 +46,7 @@ def main():
     if not py:
         print("SKIPPED: set TTIR2LINALG_MLIR_PYTHON to a python with the `mlir` package")
         return 2
-    ttir_path = sys.argv[1] if len(sys.argv) > 1 else "kernel.ttir"
+    ttir_path = sys.argv[1] if len(sys.argv) > 1 else "examples/archive/ttir/standalone/kernel.ttir"
     mod = Lowerer().lower_module(parse_ttir(open(ttir_path).read()))
     assert not verify_ssa(mod), "internal SSA check failed"
     text = print_module(mod)

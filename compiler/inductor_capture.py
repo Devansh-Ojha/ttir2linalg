@@ -78,11 +78,43 @@ def _ttir_function_symbols(path: Path) -> set[str]:
     ))
 
 
+def _make_fake_cuda_model(torch, model_name: str, *, input_size: int,
+                          hidden_size: int, output_size: int,
+                          sequence_length: int, embed_size: int,
+                          num_heads: int):
+    """Construct model parameters and inputs as fake CUDA tensors, no device use."""
+    try:
+        from torch._subclasses.fake_tensor import FakeTensorMode
+    except ImportError as exc:
+        raise RuntimeError(
+            "CUDA cross-compilation requires FakeTensorMode from this PyTorch build"
+        ) from exc
+    mode = FakeTensorMode()
+    try:
+        with mode, torch.device("cuda"):
+            model, shape = _model_and_input(
+                model_name, input_size=input_size, hidden_size=hidden_size,
+                output_size=output_size, sequence_length=sequence_length,
+                embed_size=embed_size, num_heads=num_heads,
+            )
+            sample = torch.randn(*shape, device="cuda")
+    except Exception as exc:
+        raise RuntimeError(
+            "could not create fake CUDA model/input; install a CUDA-enabled "
+            "PyTorch build and check its fake-tensor support: %s: %s"
+            % (type(exc).__name__, exc)
+        ) from exc
+    return model, sample
+
+
 def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-artifacts",
                      *, input_size: int = 4, hidden_size: int = 8,
                      output_size: int = 8, sequence_length: int = 128,
-                     embed_size: int = 64, num_heads: int = 2) -> dict[str, Any]:
-    """Run the real Inductor backend and persist its emitted code and graph."""
+                     embed_size: int = 64, num_heads: int = 2,
+                     mode: str = "aot-cuda") -> dict[str, Any]:
+    """Compile through Inductor; CUDA AOT mode does not execute on a device."""
+    if mode not in {"aot-cuda", "run"}:
+        raise ValueError("mode must be 'aot-cuda' or 'run'")
     output = Path(out_dir)
     output.mkdir(parents=True, exist_ok=True)
     # Triton reads these settings during import. Set them before importing
@@ -92,24 +124,46 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     os.environ["TRITON_KERNEL_DUMP"] = "1"
     os.environ["TRITON_ALWAYS_COMPILE"] = "1"
     os.environ["TRITON_DUMP_DIR"] = str(triton_dump_dir.resolve())
+    if mode == "aot-cuda":
+        os.environ["TORCH_COMPILE_DEBUG"] = "1"
+        os.environ["TORCHINDUCTOR_FORCE_DISABLE_CACHES"] = "1"
     import torch
 
-    model, shape = _model_and_input(
-        model_name, input_size=input_size, hidden_size=hidden_size,
-        output_size=output_size, sequence_length=sequence_length,
-        embed_size=embed_size, num_heads=num_heads,
-    )
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
-    sample = torch.randn(*shape, device=device)
-    exported = torch.export.export(model, (sample,))
-    graph = from_exported_graph(exported)
-    graph.name = model_name
+    if mode == "aot-cuda":
+        if not torch.backends.cuda.is_built():
+            raise RuntimeError(
+                "CUDA-target cross-compilation needs a CUDA-enabled PyTorch build; "
+                "it does not need a physical GPU"
+            )
+        model, sample = _make_fake_cuda_model(
+            torch, model_name, input_size=input_size, hidden_size=hidden_size,
+            output_size=output_size, sequence_length=sequence_length,
+            embed_size=embed_size, num_heads=num_heads,
+        )
+        device = "cuda (fake tensors; compile only)"
+    else:
+        model, shape = _model_and_input(
+            model_name, input_size=input_size, hidden_size=hidden_size,
+            output_size=output_size, sequence_length=sequence_length,
+            embed_size=embed_size, num_heads=num_heads,
+        )
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device)
+        sample = torch.randn(*shape, device=device)
+
     graph_path = output / "workload.hgir"
-    graph_path.write_text(graph.format())
     graph_json_path = output / "workload.json"
-    graph_json_path.write_text(json.dumps(graph.to_dict(), indent=2) + "\n")
-    workload = analyze_hgraph(graph)
+    graph_error = None
+    workload = None
+    try:
+        exported = torch.export.export(model, (sample,))
+        graph = from_exported_graph(exported)
+        graph.name = model_name
+        graph_path.write_text(graph.format())
+        graph_json_path.write_text(json.dumps(graph.to_dict(), indent=2) + "\n")
+        workload = analyze_hgraph(graph)
+    except Exception as exc:
+        graph_error = "%s: %s" % (type(exc).__name__, exc)
 
     compile_error = None
     code_capture_error = None
@@ -118,7 +172,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     code_units = []
     attention_backend_constraint = "not_applicable"
     attention_context = nullcontext()
-    if model_name in {"attention", "attention_mlp", "transformer_block"} and device == "cuda":
+    if model_name in {"attention", "attention_mlp", "transformer_block"} and device.startswith("cuda"):
         # Make FlashAttention a required backend for this experiment, rather
         # than inferring it from the fact that the model requested SDPA.
         try:
@@ -129,27 +183,46 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         except ImportError:
             attention_backend_constraint = "flash_attention_constraint_unavailable"
     try:
-        compiled = torch.compile(model, backend="inductor")
-        with attention_context:
-            expected = model(sample)
-            actual = compiled(sample)
-        torch.testing.assert_close(actual, expected)
-        numerical_match = True
+        if mode == "aot-cuda":
+            import torch._inductor.config as inductor_config
+
+            inductor_config.trace.enabled = True
+            inductor_config.trace.debug_dir = str((output / "torch_compile_debug").resolve())
+            compiled = torch.compile(model, backend="inductor", fullgraph=True)
+            with attention_context:
+                compiled.forward.aot_compile(((sample,), {}))
+        else:
+            compiled = torch.compile(model, backend="inductor")
+            with attention_context:
+                expected = model(sample)
+                actual = compiled(sample)
+            torch.testing.assert_close(actual, expected)
+            numerical_match = True
         compile_succeeded = True
     except Exception as exc:
         compile_error = "%s: %s" % (type(exc).__name__, exc)
 
     if compile_succeeded:
-        try:
-            from torch._inductor.utils import get_code
-
-            code_units = get_code(compiled, sample)
+        if mode == "aot-cuda":
+            debug_root = output / "torch_compile_debug"
+            for source_path in sorted(debug_root.rglob("output_code.py")):
+                code_units.append(source_path.read_text())
             if not code_units:
-                raise RuntimeError(
-                    "Inductor completed but its code capture returned no artifacts"
+                code_capture_error = (
+                    "AOT compile succeeded but no output_code.py appeared in "
+                    "the configured Inductor debug directory"
                 )
-        except Exception as exc:
-            code_capture_error = "%s: %s" % (type(exc).__name__, exc)
+        else:
+            try:
+                from torch._inductor.utils import get_code
+
+                code_units = get_code(compiled, sample)
+                if not code_units:
+                    raise RuntimeError(
+                        "Inductor completed but its code capture returned no artifacts"
+                    )
+            except Exception as exc:
+                code_capture_error = "%s: %s" % (type(exc).__name__, exc)
 
     code_paths: list[str] = []
     for index, code in enumerate(code_units):
@@ -178,7 +251,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
     # handwritten reference Triton kernels. Copy the dump artifacts into the
     # capture directory so downstream translation has a stable input.
     dumped_ttir_paths = []
-    launched_ttir_paths = []
+    referenced_ttir_paths = []
     unassociated_ttir_paths = []
     ttir_launch_associations = []
     launch_symbols = {site["kernel_symbol"] for site in launch_sites}
@@ -197,7 +270,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
                 "matched_launch_symbols": matched_symbols,
             })
             if matched_symbols:
-                launched_ttir_paths.append(str(target))
+                referenced_ttir_paths.append(str(target))
             else:
                 unassociated_ttir_paths.append(str(target))
 
@@ -205,6 +278,9 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         "model": model_name,
         "torch_version": torch.__version__,
         "device": device,
+        "compile_mode": mode,
+        "physical_gpu_used": mode == "run" and device == "cuda",
+        "runtime_validated": numerical_match is True,
         "compiler": "torch.compile(backend='inductor')",
         "inductor_status": (
             "captured" if code_units else
@@ -213,15 +289,15 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         "code_origin": "pytorch_inductor" if code_units else None,
         "code_artifacts": code_paths,
         "code_count": len(code_paths),
-        "inductor_kernel_launch_count": len(launch_sites),
+        "inductor_kernel_launch_site_count": len(launch_sites),
         "inductor_kernel_launch_sites": launch_sites,
         "generated_code_kinds": sorted({Path(p).suffix for p in code_paths}),
         "inductor_triton_kernel_artifacts": triton_paths,
         "inductor_triton_kernel_count": len(triton_paths),
         "inductor_ttir_artifacts": dumped_ttir_paths,
         "inductor_ttir_kernel_count": len(dumped_ttir_paths),
-        "inductor_launched_ttir_artifacts": launched_ttir_paths,
-        "inductor_launched_ttir_kernel_count": len(launched_ttir_paths),
+        "inductor_wrapper_referenced_ttir_artifacts": referenced_ttir_paths,
+        "inductor_wrapper_referenced_ttir_kernel_count": len(referenced_ttir_paths),
         "inductor_unassociated_ttir_artifacts": unassociated_ttir_paths,
         "inductor_ttir_launch_associations": ttir_launch_associations,
         "inductor_kernel_launch_symbols": sorted(launch_symbols),
@@ -232,13 +308,18 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         "hgraph_origin": "torch.export",
         "hgraph_artifact": str(graph_path),
         "hgraph_json_artifact": str(graph_json_path),
-        "hgraph_op_count": len(graph.ops),
-        "workload_analysis": workload.to_dict(),
+        "hgraph_op_count": len(graph.ops) if workload is not None else None,
+        "hgraph_error": graph_error,
+        "workload_analysis": workload.to_dict() if workload is not None else None,
         "atlas_virtual_ops_emitted": False,
     }
     if model_name in {"attention", "attention_mlp", "transformer_block"}:
         report["attention_request"] = "nn.MultiheadAttention(need_weights=False) / SDPA"
         report["attention_backend_constraint"] = attention_backend_constraint
+        report["flash_attention_backend_compiled_under_constraint"] = (
+            attention_backend_constraint == "flash_attention_required"
+            and compile_succeeded
+        )
         report["flash_attention_backend_forced_and_run_succeeded"] = (
             attention_backend_constraint == "flash_attention_required"
             and numerical_match is True
@@ -262,7 +343,7 @@ def capture_inductor(model_name: str = "mlp", out_dir: str | Path = "inductor-ar
         )
     if model_name in {"attention_mlp", "transformer_block"}:
         report["one_kernel_fusion_observed"] = (
-            len(launch_sites) == 1 if device == "cuda" and code_units else None
+            len(launch_sites) == 1 if device.startswith("cuda") and code_units else None
         )
     report_path = output / "capture.json"
     report["report_artifact"] = str(report_path)
@@ -290,6 +371,8 @@ def main() -> None:
     parser.add_argument("--model", choices=(
         "linear_relu", "mlp", "attention", "attention_mlp", "transformer_block"
     ), default="mlp")
+    parser.add_argument("--mode", choices=("aot-cuda", "run"), default="aot-cuda",
+                        help="aot-cuda cross-compiles with fake CUDA tensors and no GPU")
     parser.add_argument("--out-dir", type=Path, default=Path("inductor-artifacts"))
     parser.add_argument("--input-size", type=int, default=4)
     parser.add_argument("--hidden-size", type=int, default=8)
@@ -302,7 +385,7 @@ def main() -> None:
         args.model, args.out_dir,
         input_size=args.input_size, hidden_size=args.hidden_size,
         output_size=args.output_size, sequence_length=args.sequence_length,
-        embed_size=args.embed_size, num_heads=args.num_heads,
+        embed_size=args.embed_size, num_heads=args.num_heads, mode=args.mode,
     ), indent=2))
 
 

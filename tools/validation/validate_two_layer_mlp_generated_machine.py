@@ -21,7 +21,7 @@ from npu_model.logging import LoggerConfig
 from npu_model.simulation import Simulation
 from npu_model.software.program import InstantiableProgram
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 ARTIFACTS = ROOT / "out/atlas/two_layer_mlp_generated.lowered"
 MAX_CYCLES = 100000
 MLIR = ROOT / "out/atlas/two_layer_mlp_generated.virtual.mlir"

@@ -74,6 +74,6 @@ def print_pass_boundary_breakdown(ttir_dir: Path):
 
 if __name__ == "__main__":
     repo_root = Path(__file__).parent.parent
-    mlp_ttir_dir = repo_root / "mlp-ttir"
+    mlp_ttir_dir = repo_root / "out" / "legacy" / "mlp-ttir"
     if mlp_ttir_dir.exists():
         print_pass_boundary_breakdown(mlp_ttir_dir)

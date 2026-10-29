@@ -349,7 +349,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", default="mlp_linear_relu.ttir")
+    parser.add_argument("--out", default="out/legacy/mlp_linear_relu.ttir")
     parser.add_argument("--mlp-dir", default=None)
     parser.add_argument("--input-size", type=int, default=4)
     parser.add_argument("--output-size", type=int, default=8)

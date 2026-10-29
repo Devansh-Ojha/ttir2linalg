@@ -144,7 +144,7 @@ def main():
 
     if args.inspect_passes:
         from compiler.pass_inspector import get_pass_boundary_report
-        ttir_dir = args.ttir_dir or Path("mlp-ttir")
+        ttir_dir = args.ttir_dir or Path("out/legacy/mlp-ttir")
         report_text = get_pass_boundary_report(ttir_dir)
         print(report_text)
         if args.inspect_out:
@@ -165,7 +165,7 @@ def main():
             write_model_triton_source,
         )
 
-        source_dir = args.triton_dir or Path("mlp-triton")
+        source_dir = args.triton_dir or Path("out/legacy/mlp-triton")
         files = write_model_triton_source(
             source_dir,
             model_name=args.model,
@@ -187,7 +187,7 @@ def main():
     if args.compile_triton:
         from compiler.triton_capture import write_verified_ttir
 
-        ttir_path = args.ttir_out or Path("mlp_linear.ttir")
+        ttir_path = args.ttir_out or Path("out/legacy/mlp_linear.ttir")
         write_verified_ttir(
             ttir_path,
             input_size=args.input_size,
@@ -198,7 +198,7 @@ def main():
     if args.compile_mlp_triton or args.compile_model_triton:
         from compiler.triton_capture import write_model_ttir
 
-        ttir_dir = args.ttir_dir or Path("mlp-ttir")
+        ttir_dir = args.ttir_dir or Path("out/legacy/mlp-ttir")
         ttir_paths.extend(write_model_ttir(
             ttir_dir,
             model_name=args.model,

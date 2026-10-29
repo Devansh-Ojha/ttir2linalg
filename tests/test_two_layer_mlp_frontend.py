@@ -5,6 +5,7 @@ from contextlib import redirect_stdout
 from dataclasses import replace
 from io import StringIO
 from pathlib import Path
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ from compiler.ttir_to_atlas import convert_file, main
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "examples/two_layer_mlp_fp8.ttir"
+sys.path.insert(0, str(ROOT / "tools" / "validation"))
 
 
 class TwoLayerMlpFrontendTest(unittest.TestCase):

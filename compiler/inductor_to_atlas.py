@@ -34,11 +34,11 @@ def map_capture(capture_dir: Path, output_dir: Path | None = None) -> dict[str, 
     if not report_path.is_file():
         raise FileNotFoundError("missing Inductor capture report: %s" % report_path)
     capture = json.loads(report_path.read_text())
-    raw_artifacts = capture.get("inductor_launched_ttir_artifacts", [])
+    raw_artifacts = capture.get("inductor_wrapper_referenced_ttir_artifacts", [])
     artifacts = [Path(p) for p in raw_artifacts]
     if not artifacts:
         raise RuntimeError(
-            "no TTIR dump was associated with an Inductor wrapper launch; check "
+            "no TTIR dump was associated with an Inductor wrapper launch site; check "
             "inductor_kernel_launch_symbols and inductor_unassociated_ttir_artifacts"
         )
     output_dir = (output_dir or capture_dir / "atlas").resolve()
@@ -83,7 +83,7 @@ def map_capture(capture_dir: Path, output_dir: Path | None = None) -> dict[str, 
         "model": capture.get("model"),
         "input_capture": str(report_path),
         "source": "compiler-dumped TTIR from PyTorch Inductor",
-        "inductor_launched_ttir_kernel_count": len(artifacts),
+        "inductor_wrapper_referenced_ttir_kernel_count": len(artifacts),
         "mapped_kernel_count": sum(r["status"] == "mapped" for r in results),
         "unsupported_kernel_count": sum(r["status"] != "mapped" for r in results),
         "kernels": results,

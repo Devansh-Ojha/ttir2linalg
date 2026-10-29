@@ -2,10 +2,11 @@
 
 ## Objective
 
-For representative PyTorch workloads, run the real TorchInductor backend,
-capture its generated kernels and compiler IR, and translate supported emitted
-operations into Atlas virtual SSA. The workloads are a linear+ReLU, a two-layer
-MLP, FlashAttention/SDPA, and a small attention-plus-MLP Transformer block.
+For representative PyTorch workloads, run the real TorchInductor backend in
+CUDA AOT cross-compile mode, capture its generated kernels and compiler IR,
+and translate supported emitted operations into Atlas virtual SSA without
+requiring a physical GPU. The workloads are a linear+ReLU, a two-layer MLP,
+FlashAttention/SDPA, and a small attention-plus-MLP Transformer block.
 Generated Atlas operations must name their exact Inductor TTIR source; the
 separate `torch.export` HGraph is optional semantic context and is never a
 substitute for consuming Inductor output.
@@ -14,7 +15,7 @@ substitute for consuming Inductor output.
 
 ```text
 PyTorch module + example inputs
-  -> torch.compile(..., backend="inductor")
+  -> torch.compile(..., backend="inductor").forward.aot_compile(fake CUDA inputs)
   -> Inductor generated source + Triton compiler TTIR dumps (when emitted)
   -> parse and recognize supported operations in those exact TTIR files
   -> Atlas virtual SSA with explicit tile/precision/ABI policy
@@ -29,7 +30,8 @@ handwritten Triton examples remain reference fixtures only.
 ## Workloads and fusion
 
 Use a single linear+ReLU and two-layer MLP as the first end-to-end cases, then
-force the PyTorch SDPA FlashAttention backend for attention workloads on CUDA.
+force the PyTorch SDPA FlashAttention backend for CUDA-targeted attention
+compiles.
 The attention+MLP block combines attention, residual/normalization work, and a
 feed-forward MLP. Record how many real generated kernels exist and which exact
 ones map. Pursue a monolithic Atlas kernel as an optimization goal; do not
@@ -39,8 +41,9 @@ whole-block fusion is not supported.
 
 ## Completion criteria
 
-- One command captures actual Inductor code and Triton TTIR dumps for each
-  workload, with numerical-check and backend-selection results recorded.
+- One command cross-compiles for CUDA and captures actual Inductor code and
+  Triton TTIR dumps without needing a physical GPU. Optional GPU execution
+  records numerical checks.
 - Atlas conversion consumes those exact TTIR artifacts and writes one output
   per mapped kernel. Every unmapped kernel has a diagnostic; no HGraph or
   handwritten-kernel fallback is mislabeled as an Inductor lowering.
@@ -51,16 +54,18 @@ whole-block fusion is not supported.
 
 ## Current implementation state
 
-`compiler.inductor_capture` invokes real Inductor, enables Triton's compiler
-IR dump before importing PyTorch, saves generated code and exact `.ttir` dumps,
-and forces Flash SDPA for CUDA attention workloads. It then invokes
+`compiler.inductor_capture` defaults to PyTorch's AOT compile API with fake
+CUDA tensors. It enables Triton's compiler IR dump before importing PyTorch,
+saves generated code and exact `.ttir` dumps, and forces Flash SDPA for CUDA
+attention workloads. It then invokes
 `compiler.inductor_to_atlas`, which consumes only those dumped TTIR files and
 tries the repository's strict Atlas workload recognizers. Successful matches
 produce per-kernel virtual MLIR with source provenance; unmatched kernels are
 listed with the attempted-pattern diagnostics. This path is structurally
-implemented but still needs to be run on BWRC to confirm the installed
-PyTorch/Triton versions, actual FlashAttention selection, and which Inductor
-TTIR shapes match the bounded Atlas recognizers.
+implemented but still needs to be run on BWRC to confirm its installed
+PyTorch/toolchain supports fake-CUDA AOT compilation, FlashAttention codegen
+without a device, and which Inductor TTIR shapes match the bounded Atlas
+recognizers. Optional `--mode run` executes on a GPU for numerical validation.
 
 The existing HGraph-to-Atlas mapper remains a separate graph-semantics
 experiment. It does not feed the Inductor-kernel path. The repository's older

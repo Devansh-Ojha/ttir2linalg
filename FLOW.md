@@ -5,14 +5,14 @@ the actual Inductor/Triton compiler. The source `torch.export` HGraph is saved
 for context; it does not provide operations to the Inductor-to-Atlas mapper.
 
 ```text
-model/*.py + sample tensors
+model/*.py + fake CUDA sample tensors
        │
        ▼
-torch.compile(..., backend="inductor")
+torch.compile(..., backend="inductor").forward.aot_compile(...)
        ├── generated wrapper / Triton source ──► inductor_*.py/.cpp
        ├── actual Triton compilation ──────────► inductor_ttir/*.ttir
        ├── torch.export (context only) ─────────► workload.hgir/.json
-       └── eager comparison + evidence ─────────► capture.json
+       └── compiler evidence + optional run check ► capture.json
                                                     │
                                                     ▼
                                     compiler.inductor_to_atlas
@@ -26,12 +26,14 @@ torch.compile(..., backend="inductor")
                                       scheduling / allocation / lowering
 ```
 
-`compiler/inductor_capture.py` sets `TRITON_KERNEL_DUMP` and the dump directory
-before importing PyTorch, so TTIR comes from Triton compiling Inductor's own
-kernels. It never recompiles the project's handwritten Triton reference
-kernels for this route. CUDA is needed for the Triton kernel path. For attention
-workloads the capture restricts SDPA to FlashAttention on CUDA; if the shape,
-device, or installed stack cannot select it, the capture reports the failure.
+`compiler/inductor_capture.py` defaults to AOT cross-compilation with fake CUDA
+tensors. It sets `TRITON_KERNEL_DUMP` and the dump directory before importing
+PyTorch, so TTIR comes from Triton compiling Inductor's own kernels. This needs
+a CUDA-enabled PyTorch/toolchain but no physical GPU. It never recompiles the
+project's handwritten Triton reference kernels for this route. For attention,
+capture restricts SDPA to FlashAttention; unsupported fake-device capability
+queries or shapes are recorded as compile failures. `--mode run` is the
+optional path that executes and numerically checks on an available device.
 
 `compiler/inductor_to_atlas.py` reads the TTIR artifact list in `capture.json`
 and attempts the existing strict analyzers for linear+ReLU, attention,

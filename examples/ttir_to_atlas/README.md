@@ -78,7 +78,7 @@ Examples:
 
 ```bash
 PYTHONPATH=. python -m compiler.ttir_to_atlas \
-  mlp-ttir-test/kernel_0_fc1_relu.ttir --pattern linear-relu \
+  examples/archive/ttir/mlp/kernel_0_fc1_relu.ttir --pattern linear-relu \
   --numerical-policy atlas-fp8-linear-v1 --output-features 8 \
   --out out/atlas/mlp.virtual.mlir
 
@@ -87,7 +87,7 @@ PYTHONPATH=. python -m compiler.ttir_to_atlas \
   --numerical-policy atlas-fp8-mlp-v1 --out out/atlas/mlp2.virtual.mlir
 
 PYTHONPATH=. python -m compiler.ttir_to_atlas \
-  attention-ttir/kernel_0_attention.ttir --pattern attention \
+  examples/archive/ttir/attention/kernel_0_attention.ttir --pattern attention \
   --numerical-policy atlas-fp8-attention-v1 \
   --out out/atlas/attention.virtual.mlir
 ```

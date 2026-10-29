@@ -1,3 +1,4 @@
+import os
 import re
 
 from triton.compiler import ASTSource
@@ -155,11 +156,13 @@ def main():
             lowered_ops.append(lowered)
             print(lowered)
 
-    with open("linalg.mlir", "w") as f:
+    output_path = "out/legacy/linalg.mlir"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
         f.write("\n".join(lowered_ops) + "\n")
 
     print()
-    print("Wrote linalg.mlir")
+    print("Wrote %s" % output_path)
 
 
 if __name__ == "__main__":

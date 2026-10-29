@@ -14,7 +14,7 @@ import torch
 from atlas_virtual_evaluator import RuntimeInputs, Tile, evaluate, operation_name, parse_program
 from npu_model.configs.numerics import RtlNumerics
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 GENERATED = ROOT / "out/atlas/two_layer_mlp_generated.virtual.mlir"
 REFERENCE = Path.home() / "atlas-mlir/test/examples/virtual_fp8_two_layer_mlp.mlir"
 # Independent launch ABI: X, B0[K,N], B1[K,N], and BF16 output slot zero.
