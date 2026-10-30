@@ -1,11 +1,13 @@
 # PyTorch TorchInductor kernels to Atlas virtual ops
 
 The active path starts with PyTorch models, cross-compiles them for CUDA
-through TorchInductor using fake tensors, captures the real generated Triton
-TTIR, and maps supported kernels to Atlas virtual operations. The default mode
-does **not** need a physical GPU. It does require a CUDA-enabled PyTorch build
-and compatible CUDA/Triton compiler components. The optional `--mode run`
-performs actual execution and needs a GPU.
+through TorchInductor using fake tensors, collects real generated Triton TTIR
+when compilation succeeds, and maps supported kernels to Atlas virtual operations.
+The default mode does not execute kernels, but GPU-free compilation is not
+guaranteed: the installed compiler can still query a CUDA driver/device.
+The 2026-10-29 audit reached that lookup and failed without a driver, producing
+no TTIR. See the [operation frontend investigation](examples/ttir_to_atlas/OPERATION_FRONTEND_PLAN.md).
+The optional --mode run executes on the available device (CUDA or CPU).
 
 ```text
 PyTorch model
@@ -15,6 +17,16 @@ PyTorch model
   -> per-kernel Atlas virtual MLIR + mapped/unsupported report
   -> Atlas-MLIR verification and lowering
 ```
+
+## Generalized operation compiler
+
+The separate generalized Triton → Atlas frontend accepts explicitly qualified
+static tile operations through `compiler.jit_to_atlas` (Triton Python) and
+`compiler.ttir_atlas_pipeline` (preserved TTIR). See
+[reproducible setup and validation](docs/REPRODUCING.md) for the tested versions,
+portable external-tool paths, fresh-checkout commands, and coverage limits.
+[PR inventory and commit plan](docs/PR_PACKAGING_PLAN.md) lists the exact files
+proposed for review.
 
 ## Setup
 
@@ -41,6 +53,9 @@ for model in linear_relu mlp attention_flash attention_custom_flash \
 done
 ```
 
+Use a fresh --out-dir for every invocation; existing directories are refused.
+Inductor/Triton caches and debug/dump roots are isolated within that directory.
+Capture failures return a nonzero CLI status and retain diagnostic reports.
 Each `capture.json` records generated code, wrapper launch sites, Triton TTIR files,
 FlashAttention compile status, and Atlas mapping status. `atlas/mapping.json`
 lists each wrapper-referenced TTIR kernel as mapped or unsupported with analyzer
