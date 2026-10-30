@@ -1,8 +1,13 @@
 # Install a CUDA-enabled PyTorch build with the official selector before this
 # file on BWRC; its wheel supplies the matching Triton compiler dependency.
-# The lower bound includes AOTInductor and torch.library.triton_op support.
-torch>=2.14
+# PyTorch 2.11.0 is the validated baseline, including the capture API probes.
+# See constraints/validated.txt and docs/REPRODUCING.md for the tested toolchain.
+torch>=2.11
 
 # Keep xdsl on the API version used by this repository until the MLIR frontend
 # has been checked against a newer release.
 xdsl==0.65.0
+
+# Direct imports in references/tests and target mapping.
+numpy>=2.2.6
+typing_extensions>=4.10

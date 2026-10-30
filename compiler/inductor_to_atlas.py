@@ -36,17 +36,17 @@ def map_capture(capture_dir: Path, output_dir: Path | None = None) -> dict[str, 
     capture = json.loads(report_path.read_text())
     raw_artifacts = capture.get("inductor_wrapper_referenced_ttir_artifacts", [])
     artifacts = [Path(p) for p in raw_artifacts]
-    if not artifacts:
-        raise RuntimeError(
-            "no TTIR dump was associated with an Inductor wrapper launch site; check "
-            "inductor_kernel_launch_symbols and inductor_unassociated_ttir_artifacts"
-        )
     output_dir = (output_dir or capture_dir / "atlas").resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=False)
     results = []
     for artifact in artifacts:
         if not artifact.is_absolute():
-            artifact = (capture_dir / artifact).resolve()
+            relative = (capture_dir / artifact).resolve()
+            # Older captures wrote cwd-relative paths including the capture
+            # directory prefix. Accept that spelling only within this capture.
+            legacy = artifact.resolve()
+            artifact = (legacy if not relative.is_file() and legacy.is_file()
+                        and legacy.is_relative_to(capture_dir) else relative)
         item: dict[str, Any] = {
             "source_ttir": str(artifact),
             "source_origin": "pytorch_inductor_triton_dump",
@@ -83,6 +83,8 @@ def map_capture(capture_dir: Path, output_dir: Path | None = None) -> dict[str, 
         "model": capture.get("model"),
         "input_capture": str(report_path),
         "source": "compiler-dumped TTIR from PyTorch Inductor",
+        "input_status": "associated_ttir" if artifacts else "no_associated_ttir",
+        "unassociated_ttir_artifacts": capture.get("inductor_unassociated_ttir_artifacts", []),
         "inductor_wrapper_referenced_ttir_kernel_count": len(artifacts),
         "mapped_kernel_count": sum(r["status"] == "mapped" for r in results),
         "unsupported_kernel_count": sum(r["status"] != "mapped" for r in results),

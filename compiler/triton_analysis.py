@@ -131,6 +131,28 @@ class TwoLayerMlp:
 
 
 @dataclass(frozen=True)
+class MlpLayer:
+    """One source dot/cast, with ReLU and FP8 conversion on hidden layers."""
+
+    dot: TOp
+    bf16_cast: TOp
+    weight: TValue
+    relu: Optional[TOp] = None
+    pack: Optional[TOp] = None
+
+
+@dataclass(frozen=True)
+class MlpChain:
+    """Ordered source dataflow; contains no target arithmetic or placement policy."""
+
+    function: str
+    input_activation: TValue
+    weights: tuple[TValue, ...]
+    layers: tuple[MlpLayer, ...]
+    store: TOp
+
+
+@dataclass(frozen=True)
 class LinearRelu:
     """One vector dot product, bias add, ReLU, and scalar store per program."""
 
@@ -169,11 +191,16 @@ class ScaledDotProductAttention:
     embedding_size: int
 
 
-def analyze_two_layer_mlp(function: TFunc) -> TwoLayerMlp:
-    """Admit only a straight-line, bias-free 32x32 E4M3FN two-dot graph."""
+def analyze_mlp_chain(function: TFunc) -> MlpChain:
+    """Recognize a bias-free, straight-line FP8 chain of at least two layers.
+
+    Walk backward from the only store, retaining the actual SSA operations.
+    Dots require explicit IEEE input precision; optional maxNumImpreciseAcc
+    must be zero. No scheduling, quantization policy or allocation is inferred.
+    """
     def check(condition, message):
         if not condition:
-            raise NotImplementedError("two-layer MLP: " + message)
+            raise NotImplementedError("MLP chain: " + message)
 
     ops = function.body.ops
     definitions = {v.id: op for op in ops for v in op.results}
@@ -181,6 +208,19 @@ def analyze_two_layer_mlp(function: TFunc) -> TwoLayerMlp:
     check(len(positions) == len(ops), "duplicate operation")
     check(len(definitions) == sum(len(op.results) for op in ops), "duplicate SSA definition")
     check(all(not op.regions for op in ops), "regions/control flow are unsupported")
+    arguments = {v.id: v for v in function.args}
+    check(len(arguments) == len(function.args), "duplicate argument")
+    check(not arguments.keys() & definitions.keys(), "argument redefined by an operation")
+    # Validate all edges before traversing, including undefined values and cycles.
+    for op in ops:
+        for value in op.operands:
+            defining = definitions.get(value.id)
+            canonical = (arguments.get(value.id) if defining is None else
+                         next(v for v in defining.results if v.id == value.id))
+            check(canonical is not None, "undefined SSA dependency")
+            check(value.type == canonical.type, "inconsistent SSA value type")
+            check(defining is None or positions[id(defining)] < positions[id(op)],
+                  "non-dominating SSA dependency")
     used = set()
 
     def tile(value, element, pointer=False):
@@ -207,48 +247,69 @@ def analyze_two_layer_mlp(function: TFunc) -> TwoLayerMlp:
     check(len(store.operands) == 2 and not store.results and not store.attrs, "unsupported store")
     tile(store.operands[0], "bf16", True)
     used.add(id(store))
-    final = producer(store.operands[1], "arith.truncf", "bf16")
-    check(len(final.operands) == 1 and not final.attrs, "unsupported final conversion")
-    dot1 = producer(final.operands[0], "tt.dot", "f32")
-    check(len(dot1.operands) == 3 and not dot1.attrs, "unsupported second dot")
-    zero(dot1.operands[2], "f32")
-    pack = producer(dot1.operands[0], "tt.fp_to_fp", "f8E4M3FN")
-    check(len(pack.operands) == 1 and pack.attrs == {"rounding": "rtne"},
-          "FP8 conversion requires explicit rounding=rtne and no other attributes")
-    relu = producer(pack.operands[0], "arith.maxnumf", "bf16")
-    check(len(relu.operands) == 2 and not relu.attrs, "unsupported ReLU")
-    a, b = relu.operands
-    if _is_zero(a, definitions):
-        a, b = b, a
-    zero(b, "bf16")
-    first = producer(a, "arith.truncf", "bf16")
-    check(len(first.operands) == 1 and not first.attrs, "unsupported first BF16 conversion")
-    dot0 = producer(first.operands[0], "tt.dot", "f32")
-    check(len(dot0.operands) == 3 and not dot0.attrs, "unsupported first dot")
-    check(dot0 is not dot1, "expected two distinct dots")
-    zero(dot0.operands[2], "f32")
-    inputs = (dot0.operands[0], dot0.operands[1], dot1.operands[1])
+    current = store.operands[1]
+    reverse_layers = []
+    relu = pack = None
+    while True:
+        cast = producer(current, "arith.truncf", "bf16")
+        check(len(cast.operands) == 1 and not cast.attrs, "unsupported BF16 conversion")
+        dot = producer(cast.operands[0], "tt.dot", "f32")
+        check(len(dot.operands) == 3, "dot requires lhs, rhs and accumulator")
+        check(set(dot.attrs) <= {"inputPrecision", "maxNumImpreciseAcc"} and
+              dot.attrs.get("inputPrecision") == "ieee" and
+              re.fullmatch(r"0(?:\s*:\s*i32)?", dot.attrs.get("maxNumImpreciseAcc", "0"))
+              is not None, "unsupported dot precision attributes (requires explicit ieee)")
+        zero(dot.operands[2], "f32")
+        tile(dot.operands[0], "f8E4M3FN")
+        tile(dot.operands[1], "f8E4M3FN")
+        reverse_layers.append(MlpLayer(dot, cast, dot.operands[1], relu, pack))
+        lhs = dot.operands[0]
+        lhs_producer = definitions.get(lhs.id)
+        if lhs_producer is not None and lhs_producer.name == "tt.load":
+            break
+        pack = producer(lhs, "tt.fp_to_fp", "f8E4M3FN")
+        check(len(pack.operands) == 1 and pack.attrs == {"rounding": "rtne"},
+              "FP8 conversion requires explicit rounding=rtne and no other attributes")
+        relu = producer(pack.operands[0], "arith.maxnumf", "bf16")
+        check(len(relu.operands) == 2 and not relu.attrs, "unsupported ReLU")
+        a, b = relu.operands
+        if _is_zero(a, definitions):
+            a, b = b, a
+        zero(b, "bf16")
+        current = a
+    layers = tuple(reversed(reverse_layers))
+    check(len(layers) >= 2, "expected at least two layers")
+    weights = tuple(layer.weight for layer in layers)
+    inputs = (lhs,) + weights
     pointers = []
     for value in inputs:
         load = producer(value, "tt.load", "f8E4M3FN")
         check(len(load.operands) == 1 and not load.attrs, "only unmasked direct loads are supported")
         tile(load.operands[0], "f8E4M3FN", True)
         pointers.append(load.operands[0])
-    check(len({v.id for v in inputs}) == 3 and len({v.id for v in pointers}) == 3,
-          "expected three distinct direct FP8 loads")
+    check(len({v.id for v in inputs}) == len(inputs) and
+          len({v.id for v in pointers}) == len(inputs),
+          "expected distinct direct FP8 loads")
     check([v.id for v in function.args] == [v.id for v in pointers] + [store.operands[0].id],
-          "arguments must be X, B0, B1, output direct pointer tiles")
+          "arguments must be X, weights in layer order, output direct pointer tiles")
     returns = [op for op in ops if op.name == "tt.return"]
     check(len(returns) == 1 and returns[0] is ops[-1] and
           not returns[0].operands and not returns[0].results and not returns[0].attrs,
           "expected final void return")
     used.add(id(returns[0]))
     check(used == set(positions), "extra or unsupported operations")
-    for op in ops:
-        for value in op.operands:
-            defining = definitions.get(value.id)
-            check(defining is None or positions[id(defining)] < positions[id(op)], "non-dominating SSA dependency")
-    return TwoLayerMlp(function.name, inputs, (dot0, dot1), (first, final), relu, pack, store)
+    return MlpChain(function.name, lhs, weights, layers, store)
+
+
+def analyze_two_layer_mlp(function: TFunc) -> TwoLayerMlp:
+    """Compatibility entry point retaining the original two-layer plan shape."""
+    plan = analyze_mlp_chain(function)
+    if len(plan.layers) != 2:
+        raise NotImplementedError("two-layer MLP: expected exactly two layers")
+    first, final = plan.layers
+    return TwoLayerMlp(plan.function, (plan.input_activation,) + plan.weights,
+                       (first.dot, final.dot), (first.bf16_cast, final.bf16_cast),
+                       first.relu, first.pack, plan.store)
 
 
 def _definitions(ops: list[TOp]) -> dict[int, TOp]:

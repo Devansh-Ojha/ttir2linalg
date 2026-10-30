@@ -1,14 +1,18 @@
 """Target mapping boundary for target-neutral Triton workload plans."""
 from __future__ import annotations
 
-from typing import Protocol, TypeAlias
-
-from compiler.triton_analysis import (LinearRelu, MatmulRelu,
+from typing import Protocol, Union
+from typing_extensions import TypeAlias
+from compiler.triton_analysis import (LinearRelu, MatmulRelu, MlpChain,
                                       ScaledDotProductAttention, TwoLayerMlp)
 
-
-TritonWorkloadPlan: TypeAlias = MatmulRelu | TwoLayerMlp | LinearRelu | ScaledDotProductAttention
-
+TritonWorkloadPlan: TypeAlias = Union[
+    MatmulRelu,
+    TwoLayerMlp,
+    MlpChain,
+    LinearRelu,
+    ScaledDotProductAttention,
+]
 
 class TritonTargetMapper(Protocol):
     """Map a recognized Triton workload plan to a target IR artifact."""

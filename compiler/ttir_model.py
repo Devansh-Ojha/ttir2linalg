@@ -41,6 +41,7 @@ class TOp:
     attrs: Dict[str, str] = field(default_factory=dict)
     regions: List[List[TBlock]] = field(default_factory=list)
     index: int = 0
+    assembly: str = ""
 
     def attr_int(self, key: str) -> int:
         return int(self.attrs[key].split(":")[0].strip())
@@ -51,4 +52,5 @@ class TFunc:
     name: str
     args: List[TValue]
     body: TBlock
+    source: str = ""
 

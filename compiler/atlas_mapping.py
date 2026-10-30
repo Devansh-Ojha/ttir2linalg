@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import math
 import struct
 
-from compiler.triton_analysis import (LinearRelu, MatmulRelu,
+from compiler.triton_analysis import (LinearRelu, MatmulRelu, MlpChain,
                                       ScaledDotProductAttention, TwoLayerMlp)
 from compiler.target_mapping import TritonWorkloadPlan
 
@@ -73,9 +73,9 @@ def map_matmul_relu(plan: MatmulRelu, abi: AtlasTileABI = AtlasTileABI()) -> str
 
 @dataclass(frozen=True)
 class AtlasMlpABI:
-    """Three source [K,N] operand tiles, with fixed MXU0 then MXU1 assignment."""
+    """Source X/[K,N] weight slots; MXUs alternate 0, 1, 0, ... in chain order."""
 
-    input_slots: tuple[int, int, int] = (0, 1, 2)
+    input_slots: tuple[int, ...] = (0, 1, 2)
     input_base: int = 0x90000000
     output_base: int = 0x90002000
     output_index: int = 0
@@ -124,6 +124,93 @@ def map_two_layer_mlp(plan: TwoLayerMlp, abi: AtlasMlpABI = AtlasMlpABI(), *, nu
         '    %y = "atlas.virtual_mxu_matmul"(%h2, %w1) {unit = 1 : i32} : (!atlas.virtual_fp8, !atlas.virtual_fp8) -> !atlas.virtual_bf16',
         f'    %io4 = "atlas.virtual_output_bf16"(%io3, %y) {{index = {abi.output_index} : i32}} : (!atlas.virtual_state, !atlas.virtual_bf16) -> !atlas.virtual_state',
         '    return %io4 : !atlas.virtual_state', '  }', '}', '']
+    return "\n".join(lines)
+
+
+def map_mlp_chain(plan: MlpChain, abi: AtlasMlpABI | None = None, *,
+                  numerical_policy: str | None = None) -> str:
+    """Emit a serial chain with just-in-time weights and alternating MXU arithmetic.
+
+    Every hidden BF16 readout passes through RTL ReLU and FP8Pack(127).
+    Unit reuse changes neither the reset/readout contract nor the arithmetic
+    assigned to each layer: layer i always uses unit i % 2. The backend owns
+    physical placement, waits and timing, and must still verify resource fit
+    after scheduling (which may hoist weight loads).
+    """
+    _require(isinstance(plan, MlpChain), "expected a recognized MLP chain")
+    depth = len(plan.layers)
+    _require(2 <= depth < 64 and len(plan.weights) == depth,
+             "MLP chain needs 2..63 layers (FP8 pack permits 64 input slots)")
+    _require(numerical_policy == MLP_NUMERICAL_POLICY,
+             f"MLP chain requires numerical policy {MLP_NUMERICAL_POLICY}")
+    if abi is None:
+        abi = AtlasMlpABI(input_slots=tuple(range(depth + 1)),
+                          output_base=0x90000000 + max(4, depth + 1) * 2048)
+    slots = abi.input_slots
+    _require(len(slots) == depth + 1, "MLP slots must cover X and every weight")
+    _require(type(abi.output_index) is int and 0 <= abi.output_index < 64,
+             "invalid output index")
+    # Match the backend's conservative input/output span and pack-scratch rules.
+    _validate_tile_abi(slots, abi.input_base, abi.output_base)
+    _require(abi.output_base + (abi.output_index + 1) * 2048 <= 1 << 32,
+             "MLP output slots exceed 32-bit DRAM")
+    input_end = abi.input_base + (max(slots) + 1) * 2048
+    output_end = abi.output_base + (abi.output_index + 1) * 2048
+    _require(input_end <= abi.output_base or output_end <= abi.input_base,
+             "MLP input/output spans overlap")
+    previous = plan.input_activation
+    for i, layer in enumerate(plan.layers):
+        _require(layer.weight is plan.weights[i] and len(layer.dot.operands) == 3 and
+                 layer.dot.operands[0].id == previous.id and
+                 layer.dot.operands[1].id == layer.weight.id,
+                 "MLP layer dependencies do not match the analyzed plan")
+        for value in (previous, layer.weight):
+            _require(value.type.kind == "tensor" and value.type.shape == (32, 32) and
+                     value.type.elem.lower() == "f8e4m3fn" and not value.type.elem_is_ptr,
+                     "MLP inputs must be 32x32 E4M3FN tensors")
+        _require(len(layer.bf16_cast.operands) == 1 and
+                 layer.bf16_cast.operands[0].id == layer.dot.results[0].id,
+                 "MLP BF16 readout dependency is invalid")
+        if i < depth - 1:
+            _require(layer.relu is not None and layer.pack is not None and
+                     any(v.id == layer.bf16_cast.results[0].id for v in layer.relu.operands) and
+                     len(layer.pack.operands) == 1 and
+                     layer.pack.operands[0].id == layer.relu.results[0].id and
+                     layer.pack.attrs == {"rounding": "rtne"},
+                     "hidden MLP layer requires BF16 ReLU and RTNE FP8 conversion")
+            previous = layer.pack.results[0]
+        else:
+            _require(layer.relu is None and layer.pack is None and
+                     plan.store.operands[1].id == layer.bf16_cast.results[0].id,
+                     "final MLP layer must store its BF16 output")
+    if depth == 2:
+        first, final = plan.layers
+        legacy = TwoLayerMlp(plan.function, (plan.input_activation,) + plan.weights,
+                             (first.dot, final.dot), (first.bf16_cast, final.bf16_cast),
+                             first.relu, first.pack, plan.store)
+        return map_two_layer_mlp(legacy, abi, numerical_policy=numerical_policy)
+
+    lines = ["module {",
+             f'  func.func @ttir_{plan.function}_atlas() -> !atlas.virtual_state attributes {{atlas.input_dram_base = {abi.input_base} : i64, atlas.output_dram_base = {abi.output_base} : i64}} {{',
+             '    %io0 = "atlas.virtual_start"() : () -> !atlas.virtual_state',
+             f'    %io1, %x = "atlas.virtual_input_fp8"(%io0) {{index = {slots[0]} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_fp8)']
+    activation = "x"
+    for i, layer in enumerate(plan.layers):
+        # Load weights just before use; no unbounded bank of resident weights.
+        lines += [
+            f'    %io{i+2}, %b{i} = "atlas.virtual_input_fp8"(%io{i+1}) {{index = {slots[i+1]} : i32}} : (!atlas.virtual_state) -> (!atlas.virtual_state, !atlas.virtual_fp8)',
+            f'    %w{i} = "atlas.virtual_xlu_transpose"(%b{i}) : (!atlas.virtual_fp8) -> !atlas.virtual_fp8',
+            f'    %d{i} = "atlas.virtual_mxu_matmul"(%{activation}, %w{i}) {{unit = {i % 2} : i32}} : (!atlas.virtual_fp8, !atlas.virtual_fp8) -> !atlas.virtual_bf16',
+        ]
+        if layer.pack is not None:
+            lines += [
+                f'    %r{i} = "atlas.virtual_vpu_unary"(%d{i}) {{kind = "relu"}} : (!atlas.virtual_bf16) -> !atlas.virtual_bf16',
+                f'    %h{i} = "atlas.virtual_pack_fp8"(%r{i}) {{scale_code = 127 : i32}} : (!atlas.virtual_bf16) -> !atlas.virtual_fp8',
+            ]
+            activation = f"h{i}"
+    lines += [
+        f'    %done = "atlas.virtual_output_bf16"(%io{depth+1}, %d{depth-1}) {{index = {abi.output_index} : i32}} : (!atlas.virtual_state, !atlas.virtual_bf16) -> !atlas.virtual_state',
+        '    return %done : !atlas.virtual_state', '  }', '}', '']
     return "\n".join(lines)
 
 
@@ -248,7 +335,7 @@ class AtlasTargetMapper:
     """Atlas backend for the target-neutral workload plans in this prototype."""
 
     matmul_abi: AtlasTileABI = AtlasTileABI()
-    mlp_abi: AtlasMlpABI = AtlasMlpABI()
+    mlp_abi: AtlasMlpABI | None = None
     linear_abi: AtlasLinearReluABI = AtlasLinearReluABI()
     attention_abi: AtlasAttentionABI = AtlasAttentionABI()
     numerical_policy: str | None = None
@@ -257,8 +344,10 @@ class AtlasTargetMapper:
         if isinstance(plan, MatmulRelu):
             return map_matmul_relu(plan, self.matmul_abi)
         if isinstance(plan, TwoLayerMlp):
-            return map_two_layer_mlp(plan, self.mlp_abi,
+            return map_two_layer_mlp(plan, self.mlp_abi or AtlasMlpABI(),
                                      numerical_policy=self.numerical_policy)
+        if isinstance(plan, MlpChain):
+            return map_mlp_chain(plan, self.mlp_abi, numerical_policy=self.numerical_policy)
         if isinstance(plan, LinearRelu):
             return map_linear_relu(plan, self.linear_abi,
                                    numerical_policy=self.numerical_policy)

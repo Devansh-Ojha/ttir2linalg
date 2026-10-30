@@ -1,0 +1,29 @@
+// Logical RHS tiles are [K,N]. Requires atlas-fp8-mlp-v1 (MXU0 -> MXU1 -> MXU0).
+// Target RTL arithmetic and FP8Pack(127) are not standard TTIR FP32 equivalence.
+module {
+  tt.func public @three_layer_mlp(
+      %xp: tensor<32x32x!tt.ptr<f8E4M3FN>>,
+      %b0p: tensor<32x32x!tt.ptr<f8E4M3FN>>,
+      %b1p: tensor<32x32x!tt.ptr<f8E4M3FN>>,
+      %b2p: tensor<32x32x!tt.ptr<f8E4M3FN>>,
+      %yp: tensor<32x32x!tt.ptr<bf16>>) {
+    %x = tt.load %xp : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %b0 = tt.load %b0p : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %b1 = tt.load %b1p : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %b2 = tt.load %b2p : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %z = arith.constant dense<0.0> : tensor<32x32xf32>
+    %zb = arith.constant dense<0.0> : tensor<32x32xbf16>
+    %d0 = tt.dot %x, %b0, %z, inputPrecision = ieee : tensor<32x32xf8E4M3FN> * tensor<32x32xf8E4M3FN> -> tensor<32x32xf32>
+    %h0 = arith.truncf %d0 : tensor<32x32xf32> to tensor<32x32xbf16>
+    %r0 = arith.maxnumf %h0, %zb : tensor<32x32xbf16>
+    %p0 = tt.fp_to_fp %r0, rounding = rtne : tensor<32x32xbf16> -> tensor<32x32xf8E4M3FN>
+    %d1 = tt.dot %p0, %b1, %z, inputPrecision = ieee : tensor<32x32xf8E4M3FN> * tensor<32x32xf8E4M3FN> -> tensor<32x32xf32>
+    %h1 = arith.truncf %d1 : tensor<32x32xf32> to tensor<32x32xbf16>
+    %r1 = arith.maxnumf %h1, %zb : tensor<32x32xbf16>
+    %p1 = tt.fp_to_fp %r1, rounding = rtne : tensor<32x32xbf16> -> tensor<32x32xf8E4M3FN>
+    %d2 = tt.dot %p1, %b2, %z, inputPrecision = ieee : tensor<32x32xf8E4M3FN> * tensor<32x32xf8E4M3FN> -> tensor<32x32xf32>
+    %y = arith.truncf %d2 : tensor<32x32xf32> to tensor<32x32xbf16>
+    tt.store %yp, %y : tensor<32x32x!tt.ptr<bf16>>
+    tt.return
+  }
+}

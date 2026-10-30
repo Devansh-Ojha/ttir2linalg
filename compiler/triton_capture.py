@@ -158,6 +158,7 @@ def write_mlp_triton_source(path, input_size=4, hidden_size=8, output_size=8):
 def _compile_kernel(
     kernel, input_size: int | None = None, output_size: int | None = None,
     signature=None, constexprs=None,
+    target=None, options=None,
 ) -> str:
     try:
         from triton.backends.compiler import GPUTarget
@@ -174,14 +175,14 @@ def _compile_kernel(
             "x_ptr": "*fp32", "weight_ptr": "*fp32",
             "bias_ptr": "*fp32", "output_ptr": "*fp32",
         },
-        constexprs=constexprs or {
+        constexprs=constexprs if constexprs is not None else {
             "INPUT_SIZE": input_size, "OUTPUT_SIZE": output_size,
         },
     )
     compiled = triton_compile(
         source,
-        target=GPUTarget("cuda", 80, 32),
-        options={"num_warps": 1, "num_ctas": 1},
+        target=target if target is not None else GPUTarget("cuda", 80, 32),
+        options=options if options is not None else {"num_warps": 1, "num_ctas": 1},
     )
     try:
         return compiled.asm["ttir"]

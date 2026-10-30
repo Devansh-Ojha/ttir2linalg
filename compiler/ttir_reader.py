@@ -124,7 +124,29 @@ def _scan_text(ttir: str):
                 for kv in _split_top(am.group(1)):
                     if "=" in kv:
                         k, v = kv.split("=", 1)
+                        if k.strip() in attrs:
+                            raise RuntimeError(f"duplicate {name} attribute {k.strip()}")
                         attrs[k.strip()] = v.strip()
+        if name == "tt.dot" and not qname:
+            # Custom assembly prints precision outside the attribute dictionary.
+            spelling = _ATTR_DICT_RE.sub("", line.split("//", 1)[0])
+            dot = re.search(
+                r"tt\.dot\s+%[\w#]+\s*,\s*%[\w#]+\s*,\s*%[\w#]+\s*(.*?)\s*:",
+                spelling)
+            if dot is None:
+                raise RuntimeError("cannot reliably extract tt.dot precision attributes")
+            suffix = dot.group(1).strip()
+            if suffix:
+                if not suffix.startswith(","):
+                    raise RuntimeError("cannot reliably extract tt.dot precision attributes")
+                for entry in suffix.split(",")[1:]:
+                    match = re.fullmatch(r"\s*([A-Za-z_]\w*)\s*=\s*([A-Za-z_0-9]+)\s*", entry)
+                    if match is None:
+                        raise RuntimeError("cannot reliably extract tt.dot precision attributes")
+                    key, value = match.groups()
+                    if key in attrs:
+                        raise RuntimeError(f"duplicate tt.dot attribute {key}")
+                    attrs[key] = value
         if name == "tt.fp_to_fp":
             # Custom assembly prints this enum outside the attribute dictionary.
             rounding = re.search(r",\s*rounding\s*=\s*([A-Za-z_][A-Za-z_0-9]*)", line.split("//", 1)[0])
@@ -132,6 +154,18 @@ def _scan_text(ttir: str):
                 if "rounding" in attrs:
                     raise RuntimeError("duplicate tt.fp_to_fp rounding attribute")
                 attrs["rounding"] = rounding.group(1)
+        if name in {"arith.cmpi", "arith.cmpf"} and not qname:
+            predicate = re.search(r"arith\.cmp[if]\s+(\w+)\s*,", line)
+            if predicate:
+                attrs["predicate"] = predicate.group(1)
+        if name in {"arith.truncf", "arith.maxnumf"}:
+            # Arith also prints optional semantic flags outside its dictionary.
+            # Retain them so the bounded recognizer rejects altered arithmetic.
+            for key, value in re.findall(
+                    r"\b(fastmath|roundingmode)\s*<([^>]*)>", line.split("//", 1)[0]):
+                if key in attrs:
+                    raise RuntimeError(f"duplicate {name} attribute {key}")
+                attrs[key] = value
         found.append((name, res, attrs))
     return found
 
@@ -210,6 +244,11 @@ def parse_ttir(ttir: str) -> TTIRModule:
 
     # attributes + original SSA names from the text, matched by (name, ordinal)
     by_name: Dict[str, list] = {}
+    assembly_by_name: Dict[str, list] = {}
+    for line in _strip_locs(ttir).splitlines():
+        match = _LINE_RE.match(line)
+        if match:
+            assembly_by_name.setdefault(match.group(2) or match.group(3), []).append(line.strip())
     for name, res, attrs in _scan_text(ttir):
         by_name.setdefault(name, []).append((res, attrs))
     seen: Dict[str, int] = {}
@@ -222,6 +261,7 @@ def parse_ttir(ttir: str) -> TTIRModule:
         if k >= len(lst):
             raise RuntimeError("text scan found fewer '%s' ops than the walk" % t.name)
         res, attrs = lst[k]
+        t.assembly = assembly_by_name[t.name][k]
         t.attrs.update(attrs)
         if res and t.results:
             t.results[0].name = res
@@ -232,10 +272,12 @@ def parse_ttir(ttir: str) -> TTIRModule:
     funcs = []
     for t in tops:
         if t.name == "tt.func":
+            if len(t.regions) != 1 or len(t.regions[0]) != 1:
+                raise RuntimeError("multi-block TTIR functions are unsupported")
             body = t.regions[0][0]
             for i, a in enumerate(body.args):
                 a.name = "%%arg%d" % i
-            funcs.append(TFunc(t.attrs["sym_name"], list(body.args), body))
+            funcs.append(TFunc(t.attrs["sym_name"], list(body.args), body, ttir))
     return TTIRModule(ctx, mod, funcs, tops)
 
 

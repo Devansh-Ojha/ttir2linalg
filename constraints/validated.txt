@@ -1,0 +1,7 @@
+# Validated on Linux with Python 3.14.8; not a cross-platform lockfile.
+# Select a CUDA-enabled PyTorch wheel appropriate to your platform first.
+torch==2.11.0
+triton==3.6.0
+xdsl==0.65.0
+numpy==2.4.4
+typing_extensions==4.16.0
