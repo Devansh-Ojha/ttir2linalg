@@ -1,0 +1,36 @@
+{
+  "module": "kernels.atlas_jit_kernels",
+  "kernel": "quantized_attention",
+  "signature": {
+    "Q": "*bf16",
+    "K": "*bf16",
+    "V": "*bf16",
+    "Out": "*bf16",
+    "Scores": "*bf16",
+    "Probability": "*bf16",
+    "PackedProbability": "*fp8e4nv"
+  },
+  "constexprs": {},
+  "arch": 89,
+  "grid": [
+    1,
+    1,
+    1
+  ],
+  "options": {
+    "num_warps": 4,
+    "num_ctas": 1,
+    "enable_fp_fusion": false
+  },
+  "triton_version": "3.6.0",
+  "target": {
+    "backend": "cuda",
+    "arch": 89,
+    "warp_size": 32
+  },
+  "source_path": "/bwrcq/home/amy.yao/ttir2linalg/kernels/atlas_jit_kernels.py",
+  "source_sha256": "0a39873dbc6a66de6a52287f4835593fb0344f152cb08f701daf0b3108b43dd1",
+  "ttir_sha256": "e9963384baa8f10838b236bddd1d4b805e2d16b87882a106b01639b768eeaa2f",
+  "origin": "triton.compile(ASTSource).asm[ttir]",
+  "gpu_launched": false
+}

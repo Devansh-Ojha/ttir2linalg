@@ -1,0 +1,11 @@
+{
+  "torch": "2.15.0+cu132",
+  "triton": "3.9.0",
+  "xdsl": "0.65.0",
+  "cuda": "13.2",
+  "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+  "capability": [
+    12,
+    0
+  ]
+}

@@ -1,0 +1,15 @@
+// Handwritten source-semantic composition fixture; no Atlas equivalence claim.
+module {
+  tt.func public @reduce_scale(%bp: tensor<32x32x!tt.ptr<bf16>>, %yp: tensor<32x!tt.ptr<bf16>>) {
+    %b = tt.load %bp : tensor<32x32x!tt.ptr<bf16>>
+    %red = "tt.reduce"(%b) <{axis = 1 : i32}> ({
+    ^bb0(%lhs: bf16, %rhs: bf16):
+      %sum = arith.addf %lhs, %rhs : bf16
+      tt.reduce.return %sum : bf16
+    }) : (tensor<32x32xbf16>) -> tensor<32xbf16>
+    %s = arith.constant dense<0.500000e+00> : tensor<32xbf16>
+    %r = arith.mulf %red, %s : tensor<32xbf16>
+    tt.store %yp, %r : tensor<32x!tt.ptr<bf16>>
+    tt.return
+  }
+}

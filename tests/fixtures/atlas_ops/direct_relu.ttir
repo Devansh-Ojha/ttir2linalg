@@ -1,0 +1,10 @@
+// Handwritten direct ReLU probe, including raw NaN/sign preservation.
+module {
+  tt.func public @direct_relu(%in: tensor<32x32x!tt.ptr<bf16>>, %out: tensor<32x32x!tt.ptr<bf16>>) {
+    %x = tt.load %in : tensor<32x32x!tt.ptr<bf16>>
+    %zero = arith.constant dense<0.0> : tensor<32x32xbf16>
+    %r = arith.maxnumf %x, %zero : tensor<32x32xbf16>
+    tt.store %out, %r : tensor<32x32x!tt.ptr<bf16>>
+    tt.return
+  }
+}

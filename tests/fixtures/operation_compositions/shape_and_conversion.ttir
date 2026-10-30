@@ -1,0 +1,15 @@
+// Handwritten source-semantic composition fixture; no Atlas equivalence claim.
+module {
+  tt.func public @shape_and_conversion(%bp: tensor<32x!tt.ptr<bf16>>, %yp: tensor<32x32x!tt.ptr<bf16>>) {
+    %b = tt.load %bp : tensor<32x!tt.ptr<bf16>>
+    %e = tt.expand_dims %b {axis = 0 : i32} : tensor<32xbf16> -> tensor<1x32xbf16>
+    %c = tt.broadcast %e : tensor<1x32xbf16> -> tensor<32x32xbf16>
+    %flat = tt.reshape %c : tensor<32x32xbf16> -> tensor<1024xbf16>
+    %back = tt.reshape %flat : tensor<1024xbf16> -> tensor<32x32xbf16>
+    %f = arith.extf %back : tensor<32x32xbf16> to tensor<32x32xf32>
+    %sub = arith.subf %f, %f : tensor<32x32xf32>
+    %r = arith.truncf %sub : tensor<32x32xf32> to tensor<32x32xbf16>
+    tt.store %yp, %r : tensor<32x32x!tt.ptr<bf16>>
+    tt.return
+  }
+}

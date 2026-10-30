@@ -1,0 +1,18 @@
+// Handwritten source-semantic composition fixture; no Atlas equivalence claim.
+module {
+  tt.func public @matmul_add_matmul(%xp: tensor<32x32x!tt.ptr<f8E4M3FN>>, %wp: tensor<32x32x!tt.ptr<f8E4M3FN>>, %bp: tensor<32x32x!tt.ptr<bf16>>, %yp: tensor<32x32x!tt.ptr<bf16>>) {
+    %x = tt.load %xp : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %w = tt.load %wp : tensor<32x32x!tt.ptr<f8E4M3FN>>
+    %b = tt.load %bp : tensor<32x32x!tt.ptr<bf16>>
+    %z = arith.constant dense<0.000000e+00> : tensor<32x32xf32>
+    %zb = arith.constant dense<0.000000e+00> : tensor<32x32xbf16>
+    %d = tt.dot %x, %w, %z, inputPrecision = ieee : tensor<32x32xf8E4M3FN> * tensor<32x32xf8E4M3FN> -> tensor<32x32xf32>
+    %h = arith.truncf %d : tensor<32x32xf32> to tensor<32x32xbf16>
+    %a = arith.addf %h, %b : tensor<32x32xbf16>
+    %p = tt.fp_to_fp %a, rounding = rtne : tensor<32x32xbf16> -> tensor<32x32xf8E4M3FN>
+    %d2 = tt.dot %p, %w, %d, inputPrecision = ieee : tensor<32x32xf8E4M3FN> * tensor<32x32xf8E4M3FN> -> tensor<32x32xf32>
+    %r = arith.truncf %d2 : tensor<32x32xf32> to tensor<32x32xbf16>
+    tt.store %yp, %r : tensor<32x32x!tt.ptr<bf16>>
+    tt.return
+  }
+}

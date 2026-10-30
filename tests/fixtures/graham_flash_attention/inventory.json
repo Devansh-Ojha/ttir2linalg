@@ -1,0 +1,4733 @@
+[
+  {
+    "fixture": "attention_custom_flash/inductor_ttir/kernel_000_flash_attention_kernel.ttir",
+    "function": "flash_attention_kernel",
+    "operation_counts": {
+      "arith.addf": 2,
+      "arith.addi": 1,
+      "arith.andi": 2,
+      "arith.cmpi": 3,
+      "arith.constant": 13,
+      "arith.divf": 1,
+      "arith.maxnumf": 2,
+      "arith.mulf": 3,
+      "arith.muli": 5,
+      "arith.select": 1,
+      "arith.subf": 2,
+      "arith.truncf": 2,
+      "math.exp": 2,
+      "tt.addptr": 12,
+      "tt.broadcast": 14,
+      "tt.dot": 2,
+      "tt.expand_dims": 6,
+      "tt.get_program_id": 2,
+      "tt.load": 3,
+      "tt.make_range": 2,
+      "tt.reduce": 2,
+      "tt.reduce.return": 2,
+      "tt.return": 1,
+      "tt.splat": 5,
+      "tt.store": 1
+    },
+    "operations": [
+      {
+        "name": "arith.constant",
+        "index": 0,
+        "assembly": "%running_acc = arith.constant dense<0.000000e+00> : tensor<16x1xf32>",
+        "attributes": {
+          "value": "dense<0.000000e+00>",
+          "type": "tensor<16x1xf32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 0,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 1,
+        "assembly": "%running_sum = arith.constant dense<0.000000e+00> : tensor<16xf32>",
+        "attributes": {
+          "value": "dense<0.000000e+00>",
+          "type": "tensor<16xf32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 1,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 2,
+        "assembly": "%cst = arith.constant dense<0.000000e+00> : tensor<32x32xf16>",
+        "attributes": {
+          "value": "dense<0.000000e+00>",
+          "type": "tensor<32x32xf16>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 2,
+            "type": "tensor<32x32xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 3,
+        "assembly": "%q = arith.constant dense<0.000000e+00> : tensor<16x32xf16>",
+        "attributes": {
+          "value": "dense<0.000000e+00>",
+          "type": "tensor<16x32xf16>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 3,
+            "type": "tensor<16x32xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 4,
+        "assembly": "%cst_0 = arith.constant dense<0xFF800000> : tensor<16x32xf32>",
+        "attributes": {
+          "value": "dense<0xFF800000>",
+          "type": "tensor<16x32xf32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 4,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 5,
+        "assembly": "%cst_1 = arith.constant dense<0.176776692> : tensor<16x32xf32>",
+        "attributes": {
+          "value": "dense<0.176776692>",
+          "type": "tensor<16x32xf32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 5,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 6,
+        "assembly": "%cst_2 = arith.constant dense<32> : tensor<32x1xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<32x1xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 6,
+            "type": "tensor<32x1xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 7,
+        "assembly": "%running_max = arith.constant dense<0xFF800000> : tensor<16xf32>",
+        "attributes": {
+          "value": "dense<0xFF800000>",
+          "type": "tensor<16xf32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 7,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 8,
+        "assembly": "%cst_3 = arith.constant dense<0.000000e+00> : tensor<16x32xf32>",
+        "attributes": {
+          "value": "dense<0.000000e+00>",
+          "type": "tensor<16x32xf32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 8,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 9,
+        "assembly": "%cst_4 = arith.constant dense<32> : tensor<1x32xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<1x32xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 9,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 10,
+        "assembly": "%cst_5 = arith.constant dense<32> : tensor<16x1xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<16x1xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 10,
+            "type": "tensor<16x1xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 11,
+        "assembly": "%c1024_i32 = arith.constant 1024 : i32",
+        "attributes": {
+          "value": "1024",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 11,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 12,
+        "assembly": "%rows = arith.constant 16 : i32",
+        "attributes": {
+          "value": "16",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 12,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 13,
+        "assembly": "%query_block = tt.get_program_id x : i32",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 13,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 14,
+        "assembly": "%batch_head = tt.get_program_id y : i32",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 14,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 15,
+        "assembly": "%rows_6 = arith.muli %query_block, %rows : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 13,
+            "type": "i32"
+          },
+          {
+            "id": 12,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 15,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 16,
+        "assembly": "%rows_7 = tt.make_range {end = 16 : i32, start = 0 : i32} : tensor<16xi32>",
+        "attributes": {
+          "end": "16 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 16,
+            "type": "tensor<16xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 17,
+        "assembly": "%rows_8 = tt.splat %rows_6 : i32 -> tensor<16xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 15,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 17,
+            "type": "tensor<16xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 18,
+        "assembly": "%rows_9 = arith.addi %rows_8, %rows_7 : tensor<16xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 17,
+            "type": "tensor<16xi32>"
+          },
+          {
+            "id": 16,
+            "type": "tensor<16xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 18,
+            "type": "tensor<16xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 19,
+        "assembly": "%cols = tt.make_range {end = 32 : i32, start = 0 : i32} : tensor<32xi32>",
+        "attributes": {
+          "end": "32 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 19,
+            "type": "tensor<32xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 20,
+        "assembly": "%q_10 = arith.muli %batch_head, %c1024_i32 : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 14,
+            "type": "i32"
+          },
+          {
+            "id": 11,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 20,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 21,
+        "assembly": "%q_11 = tt.addptr %q_ptr, %q_10 : !tt.ptr<f16>, i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 21,
+            "type": "!tt.ptr<f16>"
+          },
+          {
+            "id": 20,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 22,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.expand_dims",
+        "index": 22,
+        "assembly": "%q_12 = tt.expand_dims %rows_9 {axis = 1 : i32} : tensor<16xi32> -> tensor<16x1xi32>",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [
+          {
+            "id": 18,
+            "type": "tensor<16xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 23,
+            "type": "tensor<16x1xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 23,
+        "assembly": "%q_13 = arith.muli %q_12, %cst_5 : tensor<16x1xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 23,
+            "type": "tensor<16x1xi32>"
+          },
+          {
+            "id": 10,
+            "type": "tensor<16x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 24,
+            "type": "tensor<16x1xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 24,
+        "assembly": "%q_14 = tt.splat %q_11 : !tt.ptr<f16> -> tensor<16x1x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 22,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 25,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 25,
+        "assembly": "%q_15 = tt.addptr %q_14, %q_13 : tensor<16x1x!tt.ptr<f16>>, tensor<16x1xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 25,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          },
+          {
+            "id": 24,
+            "type": "tensor<16x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 26,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.expand_dims",
+        "index": 26,
+        "assembly": "%q_16 = tt.expand_dims %cols {axis = 0 : i32} : tensor<32xi32> -> tensor<1x32xi32>",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [
+          {
+            "id": 19,
+            "type": "tensor<32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 27,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 27,
+        "assembly": "%q_17 = tt.broadcast %q_15 : tensor<16x1x!tt.ptr<f16>> -> tensor<16x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 26,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          }
+        ],
+        "results": [
+          {
+            "id": 28,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 28,
+        "assembly": "%q_18 = tt.broadcast %q_16 : tensor<1x32xi32> -> tensor<16x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 27,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 29,
+            "type": "tensor<16x32xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 29,
+        "assembly": "%q_19 = tt.addptr %q_17, %q_18 : tensor<16x32x!tt.ptr<f16>>, tensor<16x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 28,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 29,
+            "type": "tensor<16x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 30,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 30,
+        "assembly": "%q_20 = arith.cmpi slt, %q_12, %cst_5 : tensor<16x1xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 23,
+            "type": "tensor<16x1xi32>"
+          },
+          {
+            "id": 10,
+            "type": "tensor<16x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 31,
+            "type": "tensor<16x1xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 31,
+        "assembly": "%q_21 = arith.cmpi slt, %q_16, %cst_4 : tensor<1x32xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 27,
+            "type": "tensor<1x32xi32>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 32,
+            "type": "tensor<1x32xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 32,
+        "assembly": "%q_22 = tt.broadcast %q_20 : tensor<16x1xi1> -> tensor<16x32xi1>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 31,
+            "type": "tensor<16x1xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 33,
+            "type": "tensor<16x32xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 33,
+        "assembly": "%q_23 = tt.broadcast %q_21 : tensor<1x32xi1> -> tensor<16x32xi1>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 32,
+            "type": "tensor<1x32xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 34,
+            "type": "tensor<16x32xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.andi",
+        "index": 34,
+        "assembly": "%q_24 = arith.andi %q_22, %q_23 : tensor<16x32xi1>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 33,
+            "type": "tensor<16x32xi1>"
+          },
+          {
+            "id": 34,
+            "type": "tensor<16x32xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 35,
+            "type": "tensor<16x32xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 35,
+        "assembly": "%q_25 = tt.load %q_19, %q_24, %q : tensor<16x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 30,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 35,
+            "type": "tensor<16x32xi1>"
+          },
+          {
+            "id": 3,
+            "type": "tensor<16x32xf16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 36,
+            "type": "tensor<16x32xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 36,
+        "assembly": "%k = tt.addptr %k_ptr, %q_10 : !tt.ptr<f16>, i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 37,
+            "type": "!tt.ptr<f16>"
+          },
+          {
+            "id": 20,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 38,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 37,
+        "assembly": "%k_26 = arith.muli %q_16, %cst_4 : tensor<1x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 27,
+            "type": "tensor<1x32xi32>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 39,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 38,
+        "assembly": "%k_27 = tt.splat %k : !tt.ptr<f16> -> tensor<1x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 38,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 40,
+            "type": "tensor<1x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 39,
+        "assembly": "%k_28 = tt.addptr %k_27, %k_26 : tensor<1x32x!tt.ptr<f16>>, tensor<1x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 40,
+            "type": "tensor<1x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 39,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 41,
+            "type": "tensor<1x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.expand_dims",
+        "index": 40,
+        "assembly": "%k_29 = tt.expand_dims %cols {axis = 1 : i32} : tensor<32xi32> -> tensor<32x1xi32>",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [
+          {
+            "id": 19,
+            "type": "tensor<32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 42,
+            "type": "tensor<32x1xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 41,
+        "assembly": "%k_30 = tt.broadcast %k_28 : tensor<1x32x!tt.ptr<f16>> -> tensor<32x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 41,
+            "type": "tensor<1x32x!tt.ptr<f16>>"
+          }
+        ],
+        "results": [
+          {
+            "id": 43,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 42,
+        "assembly": "%k_31 = tt.broadcast %k_29 : tensor<32x1xi32> -> tensor<32x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 42,
+            "type": "tensor<32x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 44,
+            "type": "tensor<32x32xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 43,
+        "assembly": "%k_32 = tt.addptr %k_30, %k_31 : tensor<32x32x!tt.ptr<f16>>, tensor<32x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 43,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 44,
+            "type": "tensor<32x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 45,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 44,
+        "assembly": "%k_33 = arith.cmpi slt, %k_29, %cst_2 : tensor<32x1xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 42,
+            "type": "tensor<32x1xi32>"
+          },
+          {
+            "id": 6,
+            "type": "tensor<32x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 46,
+            "type": "tensor<32x1xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 45,
+        "assembly": "%k_34 = tt.broadcast %q_21 : tensor<1x32xi1> -> tensor<32x32xi1>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 32,
+            "type": "tensor<1x32xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 47,
+            "type": "tensor<32x32xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 46,
+        "assembly": "%k_35 = tt.broadcast %k_33 : tensor<32x1xi1> -> tensor<32x32xi1>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 46,
+            "type": "tensor<32x1xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 48,
+            "type": "tensor<32x32xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.andi",
+        "index": 47,
+        "assembly": "%k_36 = arith.andi %k_34, %k_35 : tensor<32x32xi1>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 47,
+            "type": "tensor<32x32xi1>"
+          },
+          {
+            "id": 48,
+            "type": "tensor<32x32xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 49,
+            "type": "tensor<32x32xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 48,
+        "assembly": "%k_37 = tt.load %k_32, %k_36, %cst : tensor<32x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 45,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 49,
+            "type": "tensor<32x32xi1>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<32x32xf16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 50,
+            "type": "tensor<32x32xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 49,
+        "assembly": "%v = tt.addptr %v_ptr, %q_10 : !tt.ptr<f16>, i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 51,
+            "type": "!tt.ptr<f16>"
+          },
+          {
+            "id": 20,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 52,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 50,
+        "assembly": "%v_38 = arith.muli %k_29, %cst_2 : tensor<32x1xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 42,
+            "type": "tensor<32x1xi32>"
+          },
+          {
+            "id": 6,
+            "type": "tensor<32x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 53,
+            "type": "tensor<32x1xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 51,
+        "assembly": "%v_39 = tt.splat %v : !tt.ptr<f16> -> tensor<32x1x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 52,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 54,
+            "type": "tensor<32x1x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 52,
+        "assembly": "%v_40 = tt.addptr %v_39, %v_38 : tensor<32x1x!tt.ptr<f16>>, tensor<32x1xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 54,
+            "type": "tensor<32x1x!tt.ptr<f16>>"
+          },
+          {
+            "id": 53,
+            "type": "tensor<32x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 55,
+            "type": "tensor<32x1x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 53,
+        "assembly": "%v_41 = tt.broadcast %v_40 : tensor<32x1x!tt.ptr<f16>> -> tensor<32x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 55,
+            "type": "tensor<32x1x!tt.ptr<f16>>"
+          }
+        ],
+        "results": [
+          {
+            "id": 56,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 54,
+        "assembly": "%v_42 = tt.broadcast %q_16 : tensor<1x32xi32> -> tensor<32x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 27,
+            "type": "tensor<1x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 57,
+            "type": "tensor<32x32xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 55,
+        "assembly": "%v_43 = tt.addptr %v_41, %v_42 : tensor<32x32x!tt.ptr<f16>>, tensor<32x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 56,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 57,
+            "type": "tensor<32x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 58,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 56,
+        "assembly": "%v_44 = tt.load %v_43, %k_36, %cst : tensor<32x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 58,
+            "type": "tensor<32x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 49,
+            "type": "tensor<32x32xi1>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<32x32xf16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 59,
+            "type": "tensor<32x32xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.dot",
+        "index": 57,
+        "assembly": "%scores = tt.dot %q_25, %k_37, %cst_3, inputPrecision = tf32 : tensor<16x32xf16> * tensor<32x32xf16> -> tensor<16x32xf32>",
+        "attributes": {
+          "inputPrecision": "tf32"
+        },
+        "operands": [
+          {
+            "id": 36,
+            "type": "tensor<16x32xf16>"
+          },
+          {
+            "id": 50,
+            "type": "tensor<32x32xf16>"
+          },
+          {
+            "id": 8,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 60,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.mulf",
+        "index": 58,
+        "assembly": "%scores_45 = arith.mulf %scores, %cst_1 : tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 60,
+            "type": "tensor<16x32xf32>"
+          },
+          {
+            "id": 5,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 61,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.select",
+        "index": 59,
+        "assembly": "%scores_46 = arith.select %q_23, %scores_45, %cst_0 : tensor<16x32xi1>, tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 34,
+            "type": "tensor<16x32xi1>"
+          },
+          {
+            "id": 61,
+            "type": "tensor<16x32xf32>"
+          },
+          {
+            "id": 4,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 62,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.maxnumf",
+        "index": 60,
+        "assembly": "%block_max_63 = arith.maxnumf %block_max_61, %block_max_62 : f32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 63,
+            "type": "f32"
+          },
+          {
+            "id": 64,
+            "type": "f32"
+          }
+        ],
+        "results": [
+          {
+            "id": 65,
+            "type": "f32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.reduce.return",
+        "index": 61,
+        "assembly": "tt.reduce.return %block_max_63 : f32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 65,
+            "type": "f32"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.reduce",
+        "index": 62,
+        "assembly": "%block_max = \"tt.reduce\"(%scores_46) <{axis = 1 : i32}> ({",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [
+          {
+            "id": 62,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 66,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": [
+          [
+            {
+              "arguments": [
+                {
+                  "id": 63,
+                  "type": "f32"
+                },
+                {
+                  "id": 64,
+                  "type": "f32"
+                }
+              ],
+              "operation_indices": [
+                60,
+                61
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "name": "arith.maxnumf",
+        "index": 63,
+        "assembly": "%new_max = arith.maxnumf %block_max, %running_max : tensor<16xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 66,
+            "type": "tensor<16xf32>"
+          },
+          {
+            "id": 7,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 67,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.subf",
+        "index": 64,
+        "assembly": "%alpha = arith.subf %running_max, %new_max : tensor<16xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 7,
+            "type": "tensor<16xf32>"
+          },
+          {
+            "id": 67,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 68,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "math.exp",
+        "index": 65,
+        "assembly": "%alpha_47 = math.exp %alpha : tensor<16xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 68,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 69,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.expand_dims",
+        "index": 66,
+        "assembly": "%probs = tt.expand_dims %new_max {axis = 1 : i32} : tensor<16xf32> -> tensor<16x1xf32>",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [
+          {
+            "id": 67,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 70,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 67,
+        "assembly": "%probs_48 = tt.broadcast %probs : tensor<16x1xf32> -> tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 70,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 71,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.subf",
+        "index": 68,
+        "assembly": "%probs_49 = arith.subf %scores_46, %probs_48 : tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 62,
+            "type": "tensor<16x32xf32>"
+          },
+          {
+            "id": 71,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 72,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "math.exp",
+        "index": 69,
+        "assembly": "%probs_50 = math.exp %probs_49 : tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 72,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 73,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.mulf",
+        "index": 70,
+        "assembly": "%running_sum_51 = arith.mulf %alpha_47, %running_sum : tensor<16xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 69,
+            "type": "tensor<16xf32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 74,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addf",
+        "index": 71,
+        "assembly": "%running_sum_63 = arith.addf %running_sum_61, %running_sum_62 : f32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 75,
+            "type": "f32"
+          },
+          {
+            "id": 76,
+            "type": "f32"
+          }
+        ],
+        "results": [
+          {
+            "id": 77,
+            "type": "f32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.reduce.return",
+        "index": 72,
+        "assembly": "tt.reduce.return %running_sum_63 : f32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 77,
+            "type": "f32"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.reduce",
+        "index": 73,
+        "assembly": "%running_sum_52 = \"tt.reduce\"(%probs_50) <{axis = 1 : i32}> ({",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [
+          {
+            "id": 73,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 78,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": [
+          [
+            {
+              "arguments": [
+                {
+                  "id": 75,
+                  "type": "f32"
+                },
+                {
+                  "id": 76,
+                  "type": "f32"
+                }
+              ],
+              "operation_indices": [
+                71,
+                72
+              ]
+            }
+          ]
+        ]
+      },
+      {
+        "name": "arith.addf",
+        "index": 74,
+        "assembly": "%running_sum_53 = arith.addf %running_sum_51, %running_sum_52 : tensor<16xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 74,
+            "type": "tensor<16xf32>"
+          },
+          {
+            "id": 78,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 79,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.expand_dims",
+        "index": 75,
+        "assembly": "%running_acc_54 = tt.expand_dims %alpha_47 {axis = 1 : i32} : tensor<16xf32> -> tensor<16x1xf32>",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [
+          {
+            "id": 69,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 80,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.mulf",
+        "index": 76,
+        "assembly": "%running_acc_55 = arith.mulf %running_acc_54, %running_acc : tensor<16x1xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 80,
+            "type": "tensor<16x1xf32>"
+          },
+          {
+            "id": 0,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 81,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 77,
+        "assembly": "%running_acc_56 = tt.broadcast %running_acc_55 : tensor<16x1xf32> -> tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 81,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 82,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.truncf",
+        "index": 78,
+        "assembly": "%running_acc_57 = arith.truncf %probs_50 : tensor<16x32xf32> to tensor<16x32xf16>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 73,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 83,
+            "type": "tensor<16x32xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.dot",
+        "index": 79,
+        "assembly": "%running_acc_58 = tt.dot %running_acc_57, %v_44, %running_acc_56, inputPrecision = tf32 : tensor<16x32xf16> * tensor<32x32xf16> -> tensor<16x32xf32>",
+        "attributes": {
+          "inputPrecision": "tf32"
+        },
+        "operands": [
+          {
+            "id": 83,
+            "type": "tensor<16x32xf16>"
+          },
+          {
+            "id": 59,
+            "type": "tensor<32x32xf16>"
+          },
+          {
+            "id": 82,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 84,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.expand_dims",
+        "index": 80,
+        "assembly": "%result = tt.expand_dims %running_sum_53 {axis = 1 : i32} : tensor<16xf32> -> tensor<16x1xf32>",
+        "attributes": {
+          "axis": "1 : i32"
+        },
+        "operands": [
+          {
+            "id": 79,
+            "type": "tensor<16xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 85,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 81,
+        "assembly": "%result_59 = tt.broadcast %result : tensor<16x1xf32> -> tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 85,
+            "type": "tensor<16x1xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 86,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.divf",
+        "index": 82,
+        "assembly": "%result_60 = arith.divf %running_acc_58, %result_59 : tensor<16x32xf32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 84,
+            "type": "tensor<16x32xf32>"
+          },
+          {
+            "id": 86,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 87,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 83,
+        "assembly": "%0 = tt.addptr %out_ptr, %q_10 : !tt.ptr<f16>, i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 88,
+            "type": "!tt.ptr<f16>"
+          },
+          {
+            "id": 20,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 89,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 84,
+        "assembly": "%1 = tt.splat %0 : !tt.ptr<f16> -> tensor<16x1x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 89,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 90,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 85,
+        "assembly": "%2 = tt.addptr %1, %q_13 : tensor<16x1x!tt.ptr<f16>>, tensor<16x1xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 90,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          },
+          {
+            "id": 24,
+            "type": "tensor<16x1xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 91,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.broadcast",
+        "index": 86,
+        "assembly": "%3 = tt.broadcast %2 : tensor<16x1x!tt.ptr<f16>> -> tensor<16x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 91,
+            "type": "tensor<16x1x!tt.ptr<f16>>"
+          }
+        ],
+        "results": [
+          {
+            "id": 92,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 87,
+        "assembly": "%4 = tt.addptr %3, %q_18 : tensor<16x32x!tt.ptr<f16>>, tensor<16x32xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 92,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 29,
+            "type": "tensor<16x32xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 93,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.truncf",
+        "index": 88,
+        "assembly": "%5 = arith.truncf %result_60 : tensor<16x32xf32> to tensor<16x32xf16>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 87,
+            "type": "tensor<16x32xf32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 94,
+            "type": "tensor<16x32xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.store",
+        "index": 89,
+        "assembly": "tt.store %4, %5, %q_24 : tensor<16x32x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 93,
+            "type": "tensor<16x32x!tt.ptr<f16>>"
+          },
+          {
+            "id": 94,
+            "type": "tensor<16x32xf16>"
+          },
+          {
+            "id": 35,
+            "type": "tensor<16x32xi1>"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.return",
+        "index": 90,
+        "assembly": "tt.return",
+        "attributes": {},
+        "operands": [],
+        "results": [],
+        "regions": []
+      }
+    ]
+  },
+  {
+    "fixture": "attention_flash/inductor_ttir/kernel_000_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+    "function": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1",
+    "operation_counts": {
+      "arith.addi": 3,
+      "arith.cmpi": 1,
+      "arith.constant": 4,
+      "arith.divsi": 1,
+      "arith.muli": 2,
+      "arith.remsi": 1,
+      "tt.addptr": 2,
+      "tt.get_program_id": 1,
+      "tt.load": 1,
+      "tt.make_range": 1,
+      "tt.return": 1,
+      "tt.splat": 3,
+      "tt.store": 1
+    },
+    "operations": [
+      {
+        "name": "arith.constant",
+        "index": 0,
+        "assembly": "%tmp0 = arith.constant dense<96> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<96>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 0,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 1,
+        "assembly": "%cst = arith.constant dense<32> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 2,
+        "assembly": "%xmask = arith.constant dense<1024> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<1024>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 2,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 3,
+        "assembly": "%xoffset = arith.constant 128 : i32",
+        "attributes": {
+          "value": "128",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 4,
+        "assembly": "%xoffset_0 = tt.get_program_id x : i32",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 5,
+        "assembly": "%xoffset_1 = arith.muli %xoffset_0, %xoffset : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 4,
+            "type": "i32"
+          },
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 6,
+        "assembly": "%xindex = tt.make_range {end = 128 : i32, start = 0 : i32} : tensor<128xi32>",
+        "attributes": {
+          "end": "128 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 6,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 7,
+        "assembly": "%xindex_2 = tt.splat %xoffset_1 : i32 -> tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 7,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 8,
+        "assembly": "%xindex_3 = arith.addi %xindex_2, %xindex : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 7,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 6,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 9,
+        "assembly": "%xmask_4 = arith.cmpi slt, %xindex_3, %xmask : tensor<128xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 9,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.remsi",
+        "index": 10,
+        "assembly": "%x0 = arith.remsi %xindex_3, %cst : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 10,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.divsi",
+        "index": 11,
+        "assembly": "%x1 = arith.divsi %xindex_3, %cst : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 11,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 12,
+        "assembly": "%tmp0_5 = arith.addi %x0, %cst : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 10,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 12,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 13,
+        "assembly": "%tmp0_6 = arith.muli %x1, %tmp0 : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 11,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 0,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 13,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 14,
+        "assembly": "%tmp0_7 = arith.addi %tmp0_5, %tmp0_6 : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 12,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 13,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 14,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 15,
+        "assembly": "%tmp0_8 = tt.splat %in_ptr0 : !tt.ptr<f16> -> tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 15,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 16,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 16,
+        "assembly": "%tmp0_9 = tt.addptr %tmp0_8, %tmp0_7 : tensor<128x!tt.ptr<f16>>, tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 16,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 14,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 17,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 17,
+        "assembly": "%tmp0_10 = tt.load %tmp0_9, %xmask_4 : tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 17,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 18,
+            "type": "tensor<128xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 18,
+        "assembly": "%0 = tt.splat %out_ptr0 : !tt.ptr<f16> -> tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 19,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 20,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 19,
+        "assembly": "%1 = tt.addptr %0, %xindex_3 : tensor<128x!tt.ptr<f16>>, tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 20,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 21,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.store",
+        "index": 20,
+        "assembly": "tt.store %1, %tmp0_10, %xmask_4 : tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 21,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 18,
+            "type": "tensor<128xf16>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.return",
+        "index": 21,
+        "assembly": "tt.return",
+        "attributes": {},
+        "operands": [],
+        "results": [],
+        "regions": []
+      }
+    ]
+  },
+  {
+    "fixture": "attention_flash/inductor_ttir/kernel_001_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1.ttir",
+    "function": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_1",
+    "operation_counts": {
+      "arith.addi": 3,
+      "arith.cmpi": 1,
+      "arith.constant": 4,
+      "arith.divsi": 1,
+      "arith.muli": 2,
+      "arith.remsi": 1,
+      "tt.addptr": 2,
+      "tt.get_program_id": 1,
+      "tt.load": 1,
+      "tt.make_range": 1,
+      "tt.return": 1,
+      "tt.splat": 3,
+      "tt.store": 1
+    },
+    "operations": [
+      {
+        "name": "arith.constant",
+        "index": 0,
+        "assembly": "%tmp0 = arith.constant dense<96> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<96>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 0,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 1,
+        "assembly": "%cst = arith.constant dense<32> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 2,
+        "assembly": "%xmask = arith.constant dense<1024> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<1024>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 2,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 3,
+        "assembly": "%xoffset = arith.constant 256 : i32",
+        "attributes": {
+          "value": "256",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 4,
+        "assembly": "%xoffset_0 = tt.get_program_id x : i32",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 5,
+        "assembly": "%xoffset_1 = arith.muli %xoffset_0, %xoffset : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 4,
+            "type": "i32"
+          },
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 6,
+        "assembly": "%xindex = tt.make_range {end = 256 : i32, start = 0 : i32} : tensor<256xi32>",
+        "attributes": {
+          "end": "256 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 6,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 7,
+        "assembly": "%xindex_2 = tt.splat %xoffset_1 : i32 -> tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 7,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 8,
+        "assembly": "%xindex_3 = arith.addi %xindex_2, %xindex : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 7,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 6,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 9,
+        "assembly": "%xmask_4 = arith.cmpi slt, %xindex_3, %xmask : tensor<256xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 9,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.remsi",
+        "index": 10,
+        "assembly": "%x0 = arith.remsi %xindex_3, %cst : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 10,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.divsi",
+        "index": 11,
+        "assembly": "%x1 = arith.divsi %xindex_3, %cst : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 11,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 12,
+        "assembly": "%tmp0_5 = arith.addi %x0, %cst : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 10,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 12,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 13,
+        "assembly": "%tmp0_6 = arith.muli %x1, %tmp0 : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 11,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 0,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 13,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 14,
+        "assembly": "%tmp0_7 = arith.addi %tmp0_5, %tmp0_6 : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 12,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 13,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 14,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 15,
+        "assembly": "%tmp0_8 = tt.splat %in_ptr0 : !tt.ptr<f16> -> tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 15,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 16,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 16,
+        "assembly": "%tmp0_9 = tt.addptr %tmp0_8, %tmp0_7 : tensor<256x!tt.ptr<f16>>, tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 16,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 14,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 17,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 17,
+        "assembly": "%tmp0_10 = tt.load %tmp0_9, %xmask_4 : tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 17,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 18,
+            "type": "tensor<256xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 18,
+        "assembly": "%0 = tt.splat %out_ptr0 : !tt.ptr<f16> -> tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 19,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 20,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 19,
+        "assembly": "%1 = tt.addptr %0, %xindex_3 : tensor<256x!tt.ptr<f16>>, tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 20,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 21,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.store",
+        "index": 20,
+        "assembly": "tt.store %1, %tmp0_10, %xmask_4 : tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 21,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 18,
+            "type": "tensor<256xf16>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.return",
+        "index": 21,
+        "assembly": "tt.return",
+        "attributes": {},
+        "operands": [],
+        "results": [],
+        "regions": []
+      }
+    ]
+  },
+  {
+    "fixture": "attention_flash/inductor_ttir/kernel_002_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+    "function": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0",
+    "operation_counts": {
+      "arith.addi": 2,
+      "arith.cmpi": 1,
+      "arith.constant": 4,
+      "arith.divsi": 1,
+      "arith.muli": 2,
+      "arith.remsi": 1,
+      "tt.addptr": 2,
+      "tt.get_program_id": 1,
+      "tt.load": 1,
+      "tt.make_range": 1,
+      "tt.return": 1,
+      "tt.splat": 3,
+      "tt.store": 1
+    },
+    "operations": [
+      {
+        "name": "arith.constant",
+        "index": 0,
+        "assembly": "%tmp0 = arith.constant dense<96> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<96>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 0,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 1,
+        "assembly": "%cst = arith.constant dense<32> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 2,
+        "assembly": "%xmask = arith.constant dense<1024> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<1024>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 2,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 3,
+        "assembly": "%xoffset = arith.constant 256 : i32",
+        "attributes": {
+          "value": "256",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 4,
+        "assembly": "%xoffset_0 = tt.get_program_id x : i32",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 5,
+        "assembly": "%xoffset_1 = arith.muli %xoffset_0, %xoffset : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 4,
+            "type": "i32"
+          },
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 6,
+        "assembly": "%xindex = tt.make_range {end = 256 : i32, start = 0 : i32} : tensor<256xi32>",
+        "attributes": {
+          "end": "256 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 6,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 7,
+        "assembly": "%xindex_2 = tt.splat %xoffset_1 : i32 -> tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 7,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 8,
+        "assembly": "%xindex_3 = arith.addi %xindex_2, %xindex : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 7,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 6,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 9,
+        "assembly": "%xmask_4 = arith.cmpi slt, %xindex_3, %xmask : tensor<256xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 9,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.remsi",
+        "index": 10,
+        "assembly": "%x0 = arith.remsi %xindex_3, %cst : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 10,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.divsi",
+        "index": 11,
+        "assembly": "%x1 = arith.divsi %xindex_3, %cst : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 11,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 12,
+        "assembly": "%tmp0_5 = arith.muli %x1, %tmp0 : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 11,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 0,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 12,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 13,
+        "assembly": "%tmp0_6 = arith.addi %x0, %tmp0_5 : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 10,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 12,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 13,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 14,
+        "assembly": "%tmp0_7 = tt.splat %in_ptr0 : !tt.ptr<f16> -> tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 14,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 15,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 15,
+        "assembly": "%tmp0_8 = tt.addptr %tmp0_7, %tmp0_6 : tensor<256x!tt.ptr<f16>>, tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 15,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 13,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 16,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 16,
+        "assembly": "%tmp0_9 = tt.load %tmp0_8, %xmask_4 : tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 16,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 17,
+            "type": "tensor<256xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 17,
+        "assembly": "%0 = tt.splat %out_ptr0 : !tt.ptr<f16> -> tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 18,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 19,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 18,
+        "assembly": "%1 = tt.addptr %0, %xindex_3 : tensor<256x!tt.ptr<f16>>, tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 19,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 20,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.store",
+        "index": 19,
+        "assembly": "tt.store %1, %tmp0_9, %xmask_4 : tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 20,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 17,
+            "type": "tensor<256xf16>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.return",
+        "index": 20,
+        "assembly": "tt.return",
+        "attributes": {},
+        "operands": [],
+        "results": [],
+        "regions": []
+      }
+    ]
+  },
+  {
+    "fixture": "attention_flash/inductor_ttir/kernel_003_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0.ttir",
+    "function": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_0",
+    "operation_counts": {
+      "arith.addi": 2,
+      "arith.cmpi": 1,
+      "arith.constant": 4,
+      "arith.divsi": 1,
+      "arith.muli": 2,
+      "arith.remsi": 1,
+      "tt.addptr": 2,
+      "tt.get_program_id": 1,
+      "tt.load": 1,
+      "tt.make_range": 1,
+      "tt.return": 1,
+      "tt.splat": 3,
+      "tt.store": 1
+    },
+    "operations": [
+      {
+        "name": "arith.constant",
+        "index": 0,
+        "assembly": "%tmp0 = arith.constant dense<96> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<96>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 0,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 1,
+        "assembly": "%cst = arith.constant dense<32> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 2,
+        "assembly": "%xmask = arith.constant dense<1024> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<1024>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 2,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 3,
+        "assembly": "%xoffset = arith.constant 128 : i32",
+        "attributes": {
+          "value": "128",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 4,
+        "assembly": "%xoffset_0 = tt.get_program_id x : i32",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 5,
+        "assembly": "%xoffset_1 = arith.muli %xoffset_0, %xoffset : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 4,
+            "type": "i32"
+          },
+          {
+            "id": 3,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 6,
+        "assembly": "%xindex = tt.make_range {end = 128 : i32, start = 0 : i32} : tensor<128xi32>",
+        "attributes": {
+          "end": "128 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 6,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 7,
+        "assembly": "%xindex_2 = tt.splat %xoffset_1 : i32 -> tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 7,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 8,
+        "assembly": "%xindex_3 = arith.addi %xindex_2, %xindex : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 7,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 6,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 9,
+        "assembly": "%xmask_4 = arith.cmpi slt, %xindex_3, %xmask : tensor<128xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 9,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.remsi",
+        "index": 10,
+        "assembly": "%x0 = arith.remsi %xindex_3, %cst : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 10,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.divsi",
+        "index": 11,
+        "assembly": "%x1 = arith.divsi %xindex_3, %cst : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 11,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 12,
+        "assembly": "%tmp0_5 = arith.muli %x1, %tmp0 : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 11,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 0,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 12,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 13,
+        "assembly": "%tmp0_6 = arith.addi %x0, %tmp0_5 : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 10,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 12,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 13,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 14,
+        "assembly": "%tmp0_7 = tt.splat %in_ptr0 : !tt.ptr<f16> -> tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 14,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 15,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 15,
+        "assembly": "%tmp0_8 = tt.addptr %tmp0_7, %tmp0_6 : tensor<128x!tt.ptr<f16>>, tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 15,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 13,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 16,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 16,
+        "assembly": "%tmp0_9 = tt.load %tmp0_8, %xmask_4 : tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 16,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 17,
+            "type": "tensor<128xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 17,
+        "assembly": "%0 = tt.splat %out_ptr0 : !tt.ptr<f16> -> tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 18,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 19,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 18,
+        "assembly": "%1 = tt.addptr %0, %xindex_3 : tensor<128x!tt.ptr<f16>>, tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 19,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 20,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.store",
+        "index": 19,
+        "assembly": "tt.store %1, %tmp0_9, %xmask_4 : tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 20,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 17,
+            "type": "tensor<128xf16>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.return",
+        "index": 20,
+        "assembly": "tt.return",
+        "attributes": {},
+        "operands": [],
+        "results": [],
+        "regions": []
+      }
+    ]
+  },
+  {
+    "fixture": "attention_flash/inductor_ttir/kernel_004_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+    "function": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2",
+    "operation_counts": {
+      "arith.addi": 3,
+      "arith.cmpi": 1,
+      "arith.constant": 5,
+      "arith.divsi": 1,
+      "arith.muli": 2,
+      "arith.remsi": 1,
+      "tt.addptr": 2,
+      "tt.get_program_id": 1,
+      "tt.load": 1,
+      "tt.make_range": 1,
+      "tt.return": 1,
+      "tt.splat": 3,
+      "tt.store": 1
+    },
+    "operations": [
+      {
+        "name": "arith.constant",
+        "index": 0,
+        "assembly": "%tmp0 = arith.constant dense<96> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<96>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 0,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 1,
+        "assembly": "%tmp0_0 = arith.constant dense<64> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<64>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 2,
+        "assembly": "%cst = arith.constant dense<32> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 2,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 3,
+        "assembly": "%xmask = arith.constant dense<1024> : tensor<256xi32>",
+        "attributes": {
+          "value": "dense<1024>",
+          "type": "tensor<256xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 3,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 4,
+        "assembly": "%xoffset = arith.constant 256 : i32",
+        "attributes": {
+          "value": "256",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 5,
+        "assembly": "%xoffset_1 = tt.get_program_id x : i32",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 6,
+        "assembly": "%xoffset_2 = arith.muli %xoffset_1, %xoffset : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 5,
+            "type": "i32"
+          },
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 6,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 7,
+        "assembly": "%xindex = tt.make_range {end = 256 : i32, start = 0 : i32} : tensor<256xi32>",
+        "attributes": {
+          "end": "256 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 7,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 8,
+        "assembly": "%xindex_3 = tt.splat %xoffset_2 : i32 -> tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 6,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 9,
+        "assembly": "%xindex_4 = arith.addi %xindex_3, %xindex : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 7,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 9,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 10,
+        "assembly": "%xmask_5 = arith.cmpi slt, %xindex_4, %xmask : tensor<256xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 9,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 3,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 10,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.remsi",
+        "index": 11,
+        "assembly": "%x0 = arith.remsi %xindex_4, %cst : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 9,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 11,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.divsi",
+        "index": 12,
+        "assembly": "%x1 = arith.divsi %xindex_4, %cst : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 9,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 12,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 13,
+        "assembly": "%tmp0_6 = arith.addi %x0, %tmp0_0 : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 11,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 13,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 14,
+        "assembly": "%tmp0_7 = arith.muli %x1, %tmp0 : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 12,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 0,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 14,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 15,
+        "assembly": "%tmp0_8 = arith.addi %tmp0_6, %tmp0_7 : tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 13,
+            "type": "tensor<256xi32>"
+          },
+          {
+            "id": 14,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 15,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 16,
+        "assembly": "%tmp0_9 = tt.splat %in_ptr0 : !tt.ptr<f16> -> tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 16,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 17,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 17,
+        "assembly": "%tmp0_10 = tt.addptr %tmp0_9, %tmp0_8 : tensor<256x!tt.ptr<f16>>, tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 17,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 15,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 18,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 18,
+        "assembly": "%tmp0_11 = tt.load %tmp0_10, %xmask_5 : tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 18,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 10,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 19,
+            "type": "tensor<256xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 19,
+        "assembly": "%0 = tt.splat %out_ptr0 : !tt.ptr<f16> -> tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 20,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 21,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 20,
+        "assembly": "%1 = tt.addptr %0, %xindex_4 : tensor<256x!tt.ptr<f16>>, tensor<256xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 21,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<256xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 22,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.store",
+        "index": 21,
+        "assembly": "tt.store %1, %tmp0_11, %xmask_5 : tensor<256x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 22,
+            "type": "tensor<256x!tt.ptr<f16>>"
+          },
+          {
+            "id": 19,
+            "type": "tensor<256xf16>"
+          },
+          {
+            "id": 10,
+            "type": "tensor<256xi1>"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.return",
+        "index": 22,
+        "assembly": "tt.return",
+        "attributes": {},
+        "operands": [],
+        "results": [],
+        "regions": []
+      }
+    ]
+  },
+  {
+    "fixture": "attention_flash/inductor_ttir/kernel_005_triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2.ttir",
+    "function": "triton_poi_fused__scaled_dot_product_flash_attention__unsafe_view_clone_select_squeeze_transpose_unsqueeze_view_2",
+    "operation_counts": {
+      "arith.addi": 3,
+      "arith.cmpi": 1,
+      "arith.constant": 5,
+      "arith.divsi": 1,
+      "arith.muli": 2,
+      "arith.remsi": 1,
+      "tt.addptr": 2,
+      "tt.get_program_id": 1,
+      "tt.load": 1,
+      "tt.make_range": 1,
+      "tt.return": 1,
+      "tt.splat": 3,
+      "tt.store": 1
+    },
+    "operations": [
+      {
+        "name": "arith.constant",
+        "index": 0,
+        "assembly": "%tmp0 = arith.constant dense<96> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<96>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 0,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 1,
+        "assembly": "%tmp0_0 = arith.constant dense<64> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<64>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 2,
+        "assembly": "%cst = arith.constant dense<32> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<32>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 2,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 3,
+        "assembly": "%xmask = arith.constant dense<1024> : tensor<128xi32>",
+        "attributes": {
+          "value": "dense<1024>",
+          "type": "tensor<128xi32>"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 3,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.constant",
+        "index": 4,
+        "assembly": "%xoffset = arith.constant 128 : i32",
+        "attributes": {
+          "value": "128",
+          "type": "i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.get_program_id",
+        "index": 5,
+        "assembly": "%xoffset_1 = tt.get_program_id x : i32",
+        "attributes": {
+          "axis": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 5,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 6,
+        "assembly": "%xoffset_2 = arith.muli %xoffset_1, %xoffset : i32",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 5,
+            "type": "i32"
+          },
+          {
+            "id": 4,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 6,
+            "type": "i32"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.make_range",
+        "index": 7,
+        "assembly": "%xindex = tt.make_range {end = 128 : i32, start = 0 : i32} : tensor<128xi32>",
+        "attributes": {
+          "end": "128 : i32",
+          "start": "0 : i32"
+        },
+        "operands": [],
+        "results": [
+          {
+            "id": 7,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 8,
+        "assembly": "%xindex_3 = tt.splat %xoffset_2 : i32 -> tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 6,
+            "type": "i32"
+          }
+        ],
+        "results": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 9,
+        "assembly": "%xindex_4 = arith.addi %xindex_3, %xindex : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 8,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 7,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 9,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.cmpi",
+        "index": 10,
+        "assembly": "%xmask_5 = arith.cmpi slt, %xindex_4, %xmask : tensor<128xi32>",
+        "attributes": {
+          "predicate": "slt"
+        },
+        "operands": [
+          {
+            "id": 9,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 3,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 10,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.remsi",
+        "index": 11,
+        "assembly": "%x0 = arith.remsi %xindex_4, %cst : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 9,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 11,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.divsi",
+        "index": 12,
+        "assembly": "%x1 = arith.divsi %xindex_4, %cst : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 9,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 2,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 12,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 13,
+        "assembly": "%tmp0_6 = arith.addi %x0, %tmp0_0 : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 11,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 1,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 13,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.muli",
+        "index": 14,
+        "assembly": "%tmp0_7 = arith.muli %x1, %tmp0 : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 12,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 0,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 14,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "arith.addi",
+        "index": 15,
+        "assembly": "%tmp0_8 = arith.addi %tmp0_6, %tmp0_7 : tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 13,
+            "type": "tensor<128xi32>"
+          },
+          {
+            "id": 14,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 15,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 16,
+        "assembly": "%tmp0_9 = tt.splat %in_ptr0 : !tt.ptr<f16> -> tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 16,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 17,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 17,
+        "assembly": "%tmp0_10 = tt.addptr %tmp0_9, %tmp0_8 : tensor<128x!tt.ptr<f16>>, tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 17,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 15,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 18,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.load",
+        "index": 18,
+        "assembly": "%tmp0_11 = tt.load %tmp0_10, %xmask_5 : tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 18,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 10,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "results": [
+          {
+            "id": 19,
+            "type": "tensor<128xf16>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.splat",
+        "index": 19,
+        "assembly": "%0 = tt.splat %out_ptr0 : !tt.ptr<f16> -> tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 20,
+            "type": "!tt.ptr<f16>"
+          }
+        ],
+        "results": [
+          {
+            "id": 21,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.addptr",
+        "index": 20,
+        "assembly": "%1 = tt.addptr %0, %xindex_4 : tensor<128x!tt.ptr<f16>>, tensor<128xi32>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 21,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 9,
+            "type": "tensor<128xi32>"
+          }
+        ],
+        "results": [
+          {
+            "id": 22,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          }
+        ],
+        "regions": []
+      },
+      {
+        "name": "tt.store",
+        "index": 21,
+        "assembly": "tt.store %1, %tmp0_11, %xmask_5 : tensor<128x!tt.ptr<f16>>",
+        "attributes": {},
+        "operands": [
+          {
+            "id": 22,
+            "type": "tensor<128x!tt.ptr<f16>>"
+          },
+          {
+            "id": 19,
+            "type": "tensor<128xf16>"
+          },
+          {
+            "id": 10,
+            "type": "tensor<128xi1>"
+          }
+        ],
+        "results": [],
+        "regions": []
+      },
+      {
+        "name": "tt.return",
+        "index": 22,
+        "assembly": "tt.return",
+        "attributes": {},
+        "operands": [],
+        "results": [],
+        "regions": []
+      }
+    ]
+  }
+]

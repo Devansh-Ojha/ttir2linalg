@@ -146,16 +146,18 @@ def adapt(row):
     return cls(**args)
 
 
-def load_instructions():
-    document = json.loads((ARTIFACTS / "5-program.json").read_text())
+def load_instructions(artifacts=ARTIFACTS, *, expected_word_count=101, adapter=None):
+    document = json.loads((artifacts / "5-program.json").read_text())
     require(document.get("schema") == "atlas.physical_program.v1", "unsupported schema")
     require(document.get("entry_word_index") == 0 and document.get("pc_unit") == "instruction_word", "unsupported entry/PC")
     require(document.get("word_endianness") == "little", "unsupported endianness")
-    lines = (ARTIFACTS / "5-words.hex").read_text().splitlines()
+    lines = (artifacts / "5-words.hex").read_text().splitlines()
     require(all(re.fullmatch(r"[0-9a-fA-F]{8}", line) for line in lines), "invalid hex")
     words = [int(line, 16) for line in lines]
     rows = document["instructions"]
-    require(document.get("word_count") == len(rows) == len(words) == 101, "expected 101 words")
+    require(document.get("word_count") == len(rows) == len(words), "inconsistent word counts")
+    if expected_word_count is not None:
+        require(len(words) == expected_word_count, f"expected {expected_word_count} words")
     instructions = []
     for index, (row, word) in enumerate(zip(rows, words)):
         try:
@@ -169,7 +171,7 @@ def load_instructions():
             require(row["control"] == control, "control metadata mismatch")
             if row["operation"] == "atlas.delay":
                 require(row["explicit_delay_cycles"] == row["fields"]["cycles"], "delay metadata mismatch")
-            instruction = adapt(row)
+            instruction = (adapter or adapt)(row)
             require(type(row["word_u32"]) is int and instruction.to_bytecode() == row["word_u32"] == word == int(row["word_hex"], 16),
                     f"encoding mismatch: model={instruction.to_bytecode():08x}, JSON={row['word_u32']:08x}, hex={word:08x}")
             instructions.append(instruction)
@@ -179,7 +181,7 @@ def load_instructions():
     return instructions, rows
 
 
-def derive_layout(rows, virtual_spec):
+def derive_layout(rows, virtual_spec, *, depth=2, strict_legacy_layout=True):
     """Trace scalar address setup and physical stores, rejecting other layouts.
 
     The inspected helper loop changes only scratch pointers/counter and LW
@@ -216,8 +218,11 @@ def derive_layout(rows, virtual_spec):
         elif op == "atlas.branch":
             branches.append(row)
             start, end = row["control"]["target_word_index"], row["word_index"]
-            require(start == 45 and end == 73 and f["lhs"] == 13 and f["rhs"] == 14,
+            require(0 <= start < end and end - start == 28 and
+                    f["lhs"] == 13 and f["rhs"] == 14,
                     "unsupported pack helper loop")
+            if depth == 2 and strict_legacy_layout:
+                require(start == 45 and end == 73, "two-layer pack loop moved")
             for body in rows[start:end]:
                 kind, fields = body["operation"], body["fields"]
                 require(kind in {"atlas.scalar_load", "atlas.scalar_store", "atlas.delay", "atlas.alu_imm"},
@@ -232,35 +237,45 @@ def derive_layout(rows, virtual_spec):
                     {"dst": 0, "src": 0, "immediate": 0, "kind": "addi"}, "unsupported branch delay slot")
     loads = [t for t in transfers if t[0] == "load"]
     outputs = [t for t in transfers if t[0] == "store"]
-    require(len(branches) == 1 and len(loads) == 3 and len(outputs) == 2, "unexpected control/DMA inventory")
+    require(len(branches) == depth - 1 and len(loads) == depth + 1 and len(outputs) == 2,
+            "unexpected control/DMA inventory")
     require({t[1] for t in loads} == set(virtual_addresses), "physical/virtual input addresses disagree")
     require([t[1] for t in outputs] == [virtual_output, virtual_output + 1024], "unsupported output addresses")
-    require([t[3] for t in outputs] == [pops[1], pops[1] + 1], "output does not store MXU1 column halves")
+    final_register = pops[(depth - 1) % 2]
+    require([t[3] for t in outputs] == [final_register, final_register + 1],
+            "output does not store final MXU column halves")
     require(rows[-1]["operation"] == "atlas.trap" and rows[-1]["fields"]["kind"] == "ecall", "missing ecall")
     require(rows[-2]["operation"] == "atlas.csr" and
             {k: v for k, v in rows[-2]["fields"].items() if k not in METADATA} ==
             {"kind": "rrw", "address": 0xC10, "dst": 0, "source": 1} and x[1] == 1,
             "unsupported completion convention")
-    require(sum(r["operation"] == "atlas.xlu_transpose" for r in rows) == 2, "expected two physical transposes")
-    print(f"Physical DMA load order={[hex(t[1]) for t in loads]}; logical X/B0/B1 addresses={[hex(a) for a in virtual_addresses]}")
+    require(sum(r["operation"] == "atlas.xlu_transpose" for r in rows) == depth,
+            "expected one physical transpose per layer")
+    units = [r["fields"]["unit"] for r in rows if r["operation"] == "atlas.mxu_matmul"]
+    require(units == [i % 2 for i in range(depth)], "physical MXU assignment mismatch")
+    print(f"Physical DMA load order={[hex(t[1]) for t in loads]}; logical X/weights addresses={[hex(a) for a in virtual_addresses]}")
     print(f"Output columns 0:16 at {outputs[0][1]:#x}; columns 16:32 at {outputs[1][1]:#x}; little-endian BF16")
     return virtual_addresses, tuple(t[1] for t in outputs)
 
 
-def run_case(instructions, spec, addresses, output_halves, name, encoded):
+def run_case(instructions, spec, addresses, output_halves, name, encoded, *,
+             source_weights=False, reference_bits=None):
     sim = None
     try:
         virtual, slots, output_index = spec
         # Reused cases define W[N,K]. Stage B=W.T exactly once in both paths;
         # emitted XLU instructions do the runtime transpose back to W[N,K].
-        x, w0, w1 = (pair[1] for pair in encoded)
-        tiles = (x, transpose(w0), transpose(w1))
+        tiles = (encoded[0][1],) + tuple(
+            pair[1] if source_weights else transpose(pair[1]) for pair in encoded[1:])
         result = evaluate(virtual, RuntimeInputs(tiles=dict(zip(slots, tiles))))
         require(set(result.outputs) == {output_index}, "unexpected virtual outputs")
         tile = result.outputs[output_index]
         require(tile.format == "bf16" and tile.shape == (32, 32), "unsupported virtual output")
         bits = tile.bits
         expected = torch.tensor(bits, dtype=torch.uint16).reshape(32, 32)
+        if reference_bits is not None:
+            require(torch.equal(expected, reference_bits), "virtual output disagrees with independent reference")
+            expected = reference_bits
         require(bool(torch.isfinite(expected.view(torch.bfloat16)).all()), "nonfinite virtual output")
         expected_bytes = b"".join(bits[r * 32 + c].to_bytes(2, "little")
                                   for half in (0, 16) for r in range(32) for c in range(half, half + 16))

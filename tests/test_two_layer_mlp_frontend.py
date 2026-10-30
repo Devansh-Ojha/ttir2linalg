@@ -17,6 +17,7 @@ from compiler.ttir_to_atlas import convert_file, main
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "examples/two_layer_mlp_fp8.ttir"
+MATMUL_SOURCE = ROOT / "examples/archive/ttir/standalone/matmul_relu_generated.ttir"
 sys.path.insert(0, str(ROOT / "tools" / "validation"))
 
 
@@ -206,8 +207,8 @@ class TwoLayerMlpFrontendTest(unittest.TestCase):
                                "--pattern", "two-layer-mlp", "--numerical-policy", MLP_NUMERICAL_POLICY]), redirect_stdout(StringIO()):
             main()
         # Original API and CLI defaults continue to select the one-dot path.
-        self.assertIn('"atlas.virtual_xlu_transpose"', convert_file(ROOT / "matmul_relu_generated.ttir"))
-        with patch("sys.argv", ["ttir_to_atlas", str(ROOT / "matmul_relu_generated.ttir"), "--out", "/dev/null"]), redirect_stdout(StringIO()):
+        self.assertIn('"atlas.virtual_xlu_transpose"', convert_file(MATMUL_SOURCE))
+        with patch("sys.argv", ["ttir_to_atlas", str(MATMUL_SOURCE), "--out", "/dev/null"]), redirect_stdout(StringIO()):
             main()
 
 

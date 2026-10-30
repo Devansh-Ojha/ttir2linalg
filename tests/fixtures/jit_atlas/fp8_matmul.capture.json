@@ -1,0 +1,32 @@
+{
+  "module": "kernels.atlas_jit_kernels",
+  "kernel": "fp8_matmul",
+  "signature": {
+    "X": "*fp8e4nv",
+    "W": "*fp8e4nv",
+    "Out": "*bf16"
+  },
+  "constexprs": {},
+  "arch": 89,
+  "grid": [
+    1,
+    1,
+    1
+  ],
+  "options": {
+    "num_warps": 4,
+    "num_ctas": 1,
+    "enable_fp_fusion": false
+  },
+  "triton_version": "3.6.0",
+  "target": {
+    "backend": "cuda",
+    "arch": 89,
+    "warp_size": 32
+  },
+  "source_path": "/bwrcq/home/amy.yao/ttir2linalg/kernels/atlas_jit_kernels.py",
+  "source_sha256": "8c399b47c9b3c655ab38c79eec42a47bb3e37538cfa95955f3ab0fd107dbf7e6",
+  "ttir_sha256": "dbe23c0db62db02680da1f78c592935d7c2c9829e7217b08798906c5039a49c3",
+  "origin": "triton.compile(ASTSource).asm[ttir]",
+  "gpu_launched": false
+}

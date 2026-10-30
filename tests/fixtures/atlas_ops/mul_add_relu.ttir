@@ -1,0 +1,15 @@
+// Handwritten composition fixture for operation-driven emission.
+module {
+  tt.func public @mul_add_relu(%p0: tensor<32x32x!tt.ptr<bf16>>, %p1: tensor<32x32x!tt.ptr<bf16>>, %p2: tensor<32x32x!tt.ptr<bf16>>, %out: tensor<32x32x!tt.ptr<bf16>>) {
+    %x0 = tt.load %p0 : tensor<32x32x!tt.ptr<bf16>>
+    %x1 = tt.load %p1 : tensor<32x32x!tt.ptr<bf16>>
+    %x2 = tt.load %p2 : tensor<32x32x!tt.ptr<bf16>>
+    %m = arith.mulf %x0, %x1 : tensor<32x32xbf16>
+    %a = arith.addf %m, %x2 : tensor<32x32xbf16>
+    %s = arith.constant 0.0 : bf16
+    %zero = tt.splat %s : bf16 -> tensor<32x32xbf16>
+    %r = arith.maxnumf %a, %zero : tensor<32x32xbf16>
+    tt.store %out, %r : tensor<32x32x!tt.ptr<bf16>>
+    tt.return
+  }
+}

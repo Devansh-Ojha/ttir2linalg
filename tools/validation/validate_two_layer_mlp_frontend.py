@@ -4,6 +4,7 @@
 Both execute the shared RTL-aware numerical model. This checks virtual-program
 semantic equivalence, not independent RTL or hardware correctness.
 """
+from compiler.toolchain_paths import atlas_root as default_atlas_root
 import sys
 sys.dont_write_bytecode = True
 
@@ -16,7 +17,7 @@ from npu_model.configs.numerics import RtlNumerics
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATED = ROOT / "out/atlas/two_layer_mlp_generated.virtual.mlir"
-REFERENCE = Path.home() / "atlas-mlir/test/examples/virtual_fp8_two_layer_mlp.mlir"
+REFERENCE = default_atlas_root() / "test/examples/virtual_fp8_two_layer_mlp.mlir"
 # Independent launch ABI: X, B0[K,N], B1[K,N], and BF16 output slot zero.
 # The reference uses the same role slots, with weights supplied as W[N,K].
 EXPECTED_INPUT_SLOTS = (0, 1, 2)
